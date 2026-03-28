@@ -1,0 +1,325 @@
+/**
+ * animations.css
+ * Professional animation system for ElevateFlow.
+ * GPU-accelerated, minimal performance cost.
+ * 
+ * Categories:
+ *   1. Entrance / exit
+ *   2. Slide transitions
+ *   3. UI micro-interactions
+ *   4. Panel transitions
+ *   5. Media transitions
+ *   6. Loading states
+ */
+
+/* ─────────────────────────────────────────────────────────────────
+   1. ENTRANCE / EXIT KEYFRAMES
+───────────────────────────────────────────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInDown {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes springPop {
+  0%   { transform: scale(0.85); opacity: 0; }
+  60%  { transform: scale(1.04); opacity: 1; }
+  80%  { transform: scale(0.98); }
+  100% { transform: scale(1); }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   2. SLIDE TRANSITIONS (audience output)
+───────────────────────────────────────────────────────────────── */
+
+/* Hard cut — default */
+.slide-transition-cut {
+  transition: none;
+}
+
+/* Cross-dissolve */
+@keyframes dissolveIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes dissolveOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+.slide-transition-dissolve.entering {
+  animation: dissolveIn 0.5s ease forwards;
+}
+
+.slide-transition-dissolve.exiting {
+  animation: dissolveOut 0.5s ease forwards;
+  position: absolute;
+  inset: 0;
+}
+
+/* Fade through black */
+@keyframes fadeThroughBlack {
+  0%   { opacity: 1; }
+  50%  { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* Wipe left */
+@keyframes wipeLeft {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0% 0 0); }
+}
+
+.slide-transition-wipe.entering {
+  animation: wipeLeft 0.4s ease-out forwards;
+}
+
+/* Push up */
+@keyframes pushUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+.slide-transition-push.entering {
+  animation: pushUp 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   3. UI MICRO-INTERACTIONS
+───────────────────────────────────────────────────────────────── */
+
+/* Slide card hover */
+.slide-card {
+  transition:
+    transform var(--ease-normal),
+    box-shadow var(--ease-normal),
+    border-color var(--ease-fast);
+  will-change: transform;
+}
+
+.slide-card:hover:not(.slide-card--active) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.slide-card--active {
+  transform: translateY(-1px) scale(1.01);
+  transition: transform 0.15s var(--ease-spring);
+}
+
+/* Button press */
+.toolbar__btn,
+.clear-bar__layer,
+.transport-bar__btn,
+.format-btn,
+.seg-btn,
+.inspector__tab {
+  transition:
+    background var(--ease-fast),
+    border-color var(--ease-fast),
+    color var(--ease-fast),
+    transform var(--ease-fast),
+    box-shadow var(--ease-fast);
+}
+
+.toolbar__btn:active,
+.clear-bar__layer:active,
+.transport-bar__btn:active,
+.format-btn:active {
+  transform: scale(0.93);
+}
+
+/* Play button pulse when live */
+@keyframes playPulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--gold-glow); }
+  50%       { box-shadow: 0 0 0 6px transparent; }
+}
+
+.transport-bar__play--playing {
+  animation: playPulse 2s ease infinite;
+}
+
+/* Live badge pulse */
+@keyframes livePulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+.preview-screen__live-badge {
+  animation: livePulse 1.5s ease infinite;
+}
+
+/* Sync dot pulse */
+@keyframes syncPulse {
+  0%   { box-shadow: 0 0 0 0 var(--status-live-dim); }
+  70%  { box-shadow: 0 0 0 6px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.sync-panel__dot--live {
+  animation: syncPulse 2s ease infinite;
+}
+
+/* Media card hover reveal */
+.media-card__type-badge {
+  transition: opacity var(--ease-normal);
+  opacity: 0;
+}
+
+.media-card:hover .media-card__type-badge {
+  opacity: 1;
+}
+
+.media-card {
+  transition:
+    transform var(--ease-normal),
+    border-color var(--ease-fast),
+    box-shadow var(--ease-normal);
+}
+
+.media-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   4. PANEL TRANSITIONS
+───────────────────────────────────────────────────────────────── */
+
+/* Sidebar section collapse */
+.sidebar__section-body {
+  animation: slideInDown 0.2s ease forwards;
+  transform-origin: top;
+}
+
+/* Sync panel slide in */
+.sync-panel {
+  animation: slideInDown 0.25s ease forwards;
+}
+
+/* Context menu pop */
+.context-menu {
+  animation: springPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  transform-origin: top left;
+}
+
+/* Inspector tab content fade */
+.inspector__body {
+  animation: fadeIn 0.15s ease;
+}
+
+/* Mode transition */
+.edit-mode,
+.graphics-mode {
+  animation: fadeIn 0.2s ease;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   5. MEDIA / PREVIEW TRANSITIONS
+───────────────────────────────────────────────────────────────── */
+
+/* Video crossfade on source change */
+.preview-screen__bg-video {
+  transition: opacity 0.3s ease;
+}
+
+.preview-screen__text {
+  transition: opacity 0.2s ease;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   6. LOADING STATES
+───────────────────────────────────────────────────────────────── */
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-surface) 25%,
+    var(--bg-raised) 50%,
+    var(--bg-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease infinite;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-dim);
+  border-top-color: var(--gold-500);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   7. STAGGER UTILITIES (for list entry animations)
+───────────────────────────────────────────────────────────────── */
+
+.stagger-enter > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-enter > *:nth-child(2) { animation-delay: 30ms; }
+.stagger-enter > *:nth-child(3) { animation-delay: 60ms; }
+.stagger-enter > *:nth-child(4) { animation-delay: 90ms; }
+.stagger-enter > *:nth-child(5) { animation-delay: 120ms; }
+.stagger-enter > *:nth-child(6) { animation-delay: 150ms; }
+.stagger-enter > *:nth-child(7) { animation-delay: 180ms; }
+.stagger-enter > *:nth-child(8) { animation-delay: 210ms; }
+
+.stagger-enter > * {
+  animation: slideInUp 0.25s ease both;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   8. REDUCED MOTION SUPPORT
+───────────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

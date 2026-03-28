@@ -1,0 +1,487 @@
+/**
+ * edit.css
+ * Styles for EditMode and ThemeEditor.
+ * Classes match the JSX: filmstrip__, text-box__, inspector__, etc.
+ */
+
+/* ── Edit Mode layout ─────────────────────────────────────────── */
+.edit-mode {
+  display: grid;
+  grid-template-columns: 180px 1fr 280px;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+}
+
+/* ── Filmstrip (left column) ──────────────────────────────────── */
+.filmstrip {
+  background: #0c0c0c;
+  border-right: 1px solid #1a1a1a;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.filmstrip__header {
+  padding: 10px 12px 8px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #333;
+  border-bottom: 1px solid #1a1a1a;
+  flex-shrink: 0;
+}
+
+.filmstrip__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-bottom: 1px solid #141414;
+  transition: background 0.1s;
+}
+.filmstrip__item:hover { background: #141414; }
+.filmstrip__item--active { background: #181818; }
+.filmstrip__item--active .filmstrip__thumb {
+  outline: 1.5px solid #D4AF37;
+  outline-offset: -1px;
+}
+
+.filmstrip__index {
+  font-size: 9px;
+  font-weight: 700;
+  color: #333;
+  font-family: 'JetBrains Mono', monospace;
+  padding-top: 3px;
+  width: 14px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.filmstrip__thumb {
+  flex: 1;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+  min-width: 0;
+}
+
+.filmstrip__thumb-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.6;
+}
+
+.filmstrip__thumb-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4px;
+  word-break: break-word;
+  overflow: hidden;
+}
+
+/* ── Edit Canvas (centre) ─────────────────────────────────────── */
+.edit-canvas {
+  background: #080808;
+  background-image: radial-gradient(#1a1a1a 1px, transparent 1px);
+  background-size: 30px 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  cursor: default;
+  user-select: none;
+}
+
+.edit-canvas__empty {
+  color: #333;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+
+.edit-canvas__surface {
+  width: 84%;
+  max-width: 880px;
+  position: relative;
+  background: #000;
+  box-shadow: 0 40px 100px rgba(0,0,0,0.85);
+  border: 1px solid #1e1e1e;
+  overflow: hidden;
+}
+
+.edit-canvas__bg-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Smart guides ─────────────────────────────────────────────── */
+.smart-guide {
+  position: absolute;
+  background: rgba(0, 200, 255, 0.7);
+  pointer-events: none;
+  z-index: 50;
+}
+.smart-guide--v { top: 0; bottom: 0; left: 50%; width: 1px; transform: translateX(-50%); }
+.smart-guide--h { left: 0; right: 0; top: 50%; height: 1px; transform: translateY(-50%); }
+
+/* ── Text box ─────────────────────────────────────────────────── */
+.text-box {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: move;
+  box-sizing: border-box;
+}
+
+.text-box--selected {
+  outline: 1.5px dashed rgba(212,175,55,0.7);
+  outline-offset: 2px;
+}
+
+.text-box__content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  word-break: break-word;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 4px 8px;
+}
+
+.text-box__content--editing {
+  cursor: text;
+  overflow: auto;
+}
+
+/* ── Transform handles ────────────────────────────────────────── */
+.transform-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  border: 1.5px solid #D4AF37;
+  border-radius: 2px;
+  z-index: 10;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+.transform-handle--nw { top: -5px; left: -5px; cursor: nw-resize; }
+.transform-handle--n  { top: -5px; left: calc(50% - 4px); cursor: n-resize; }
+.transform-handle--ne { top: -5px; right: -5px; cursor: ne-resize; }
+.transform-handle--e  { top: calc(50% - 4px); right: -5px; cursor: e-resize; }
+.transform-handle--se { bottom: -5px; right: -5px; cursor: se-resize; }
+.transform-handle--s  { bottom: -5px; left: calc(50% - 4px); cursor: s-resize; }
+.transform-handle--sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+.transform-handle--w  { top: calc(50% - 4px); left: -5px; cursor: w-resize; }
+
+/* ── Inspector (right column) ─────────────────────────────────── */
+.inspector {
+  background: #0c0c0c;
+  border-left: 1px solid #1a1a1a;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.inspector__tabs {
+  display: flex;
+  border-bottom: 1px solid #1a1a1a;
+  flex-shrink: 0;
+}
+
+.inspector__tab {
+  flex: 1;
+  height: 36px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #444;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.inspector__tab:hover { color: #888; background: transparent; }
+.inspector__tab--active {
+  color: #D4AF37;
+  border-bottom-color: #D4AF37;
+  background: transparent;
+}
+
+.inspector__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 12px;
+}
+
+.inspector__empty {
+  color: #333;
+  font-size: 11px;
+  text-align: center;
+  padding: 30px 16px;
+}
+
+/* ── Inspector groups and fields ──────────────────────────────── */
+.inspector-group { margin-bottom: 6px; }
+
+.inspector-group__label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.inspector-prop-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.prop-box {
+  background: #111;
+  border: 1px solid #1e1e1e;
+  border-radius: 5px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.prop-box__label {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #333;
+}
+.prop-box__value {
+  font-size: 12px;
+  font-weight: 700;
+  color: #777;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.inspector-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.inspector-field__label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #444;
+}
+
+.inspector-select {
+  width: 100%;
+  height: 28px;
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 5px;
+  color: #bbb;
+  font-size: 11px;
+  padding: 0 7px;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23444'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 24px;
+}
+.inspector-select:focus { border-color: #333; }
+
+.inspector-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inspector-slider {
+  flex: 1;
+  height: 3px;
+  background: #222;
+  border-radius: 2px;
+  outline: none;
+  border: none;
+}
+
+.inspector-slider-value {
+  font-size: 10px;
+  font-weight: 700;
+  color: #555;
+  font-family: 'JetBrains Mono', monospace;
+  width: 32px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.inspector-format-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.format-btn {
+  height: 30px;
+  background: #111;
+  border: 1px solid #1e1e1e;
+  border-radius: 5px;
+  color: #555;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.format-btn:hover { background: #1a1a1a; color: #aaa; border-color: #333; }
+.format-btn--active {
+  background: rgba(212,175,55,0.12);
+  border-color: rgba(212,175,55,0.4);
+  color: #D4AF37;
+}
+
+.inspector-color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inspector-color-picker {
+  width: 32px;
+  height: 28px;
+  padding: 2px;
+  border: 1px solid #222;
+  border-radius: 5px;
+  background: #111;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.inspector-color-value {
+  font-size: 11px;
+  font-weight: 700;
+  color: #666;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.5px;
+}
+
+/* ── Copy / Paste style buttons (defined in toolbar-output-buttons.css too, keep in sync) */
+.inspector-style-actions {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+
+/* ── Edit main layout ─────────────────────────────────────────── */
+.edit-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.edit-main__canvas-wrap {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Canvas ratio bar ────────────────────────────────────────── */
+.canvas-ratio-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: #111;
+  border-bottom: 1px solid #1a1a1a;
+  flex-shrink: 0;
+}
+
+.canvas-ratio-bar__label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #333;
+  margin-right: 2px;
+}
+
+.canvas-ratio-bar__presets {
+  display: flex;
+  gap: 2px;
+}
+
+.canvas-ratio-bar__btn {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid #222;
+  color: #444;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  transition: all 0.12s;
+}
+.canvas-ratio-bar__btn:hover { background: #1e1e1e; color: #888; border-color: #333; }
+.canvas-ratio-bar__btn--active {
+  background: rgba(212,175,55,0.1);
+  border-color: rgba(212,175,55,0.4);
+  color: #D4AF37;
+}
+
+.canvas-ratio-bar__divider {
+  width: 1px;
+  height: 16px;
+  background: #1e1e1e;
+  margin: 0 2px;
+}
+
+.canvas-ratio-bar__select {
+  height: 22px;
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 4px;
+  color: #555;
+  font-size: 10px;
+  padding: 0 6px;
+  outline: none;
+  cursor: pointer;
+  font-family: -apple-system, Arial, sans-serif;
+}
+.canvas-ratio-bar__select:hover { border-color: #333; color: #888; }
+
+.canvas-ratio-bar__current {
+  margin-left: auto;
+  font-size: 10px;
+  color: #2a2a2a;
+  font-family: 'JetBrains Mono', monospace;
+}

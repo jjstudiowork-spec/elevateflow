@@ -1,0 +1,56 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ElevateFlow",
+  "version": "0.1.0",
+  "identifier": "com.kfst.elevateflow",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "splash",
+        "title": "ElevateFlow",
+        "url": "index.html#/splash",
+        "width": 560,
+        "height": 340,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "center": true,
+        "alwaysOnTop": true,
+        "shadow": true
+      },
+      {
+        "label": "main",
+        "title": "ElevateFlow",
+        "width": 1500,
+        "height": 960,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost blob: data:; media-src 'self' asset: https://asset.localhost blob: data:; connect-src 'self' https://api.github.com https://github.com https://objects.githubusercontent.com https://elevateflow.netlify.app http://localhost:1025 https://generativelanguage.googleapis.com https://www.google.com",
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon-512.png",
+      "icons/icon-128.png",
+      "icons/icon-64.png",
+      "icons/icon-32.png",
+      "icons/icon-16.png"
+    ]
+  }
+}

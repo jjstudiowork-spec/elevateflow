@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Timecode</title>
+<style>
+  body {
+    margin: 0;
+    background: #1a1a1a;
+    color: #eee;
+    font-family: Inter, system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    user-select: none;
+  }
+  .timecode-window {
+    width: 180px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .status-circle {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: red; /* default not engaged */
+    margin-right: 8px;
+    cursor: pointer;
+  }
+  .time-display {
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    flex-grow: 1;
+    user-select: text;
+  }
+  .status-text {
+    margin-top: 4px;
+    font-size: 14px;
+    text-align: center;
+    height: 20px;
+    user-select: text;
+  }
+  .settings {
+    position: relative;
+  }
+  .settings-button {
+    background: none;
+    border: none;
+    color: #eee;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0 6px;
+  }
+  .settings-dropdown {
+    position: absolute;
+    top: 28px;
+    right: 0;
+    background: #222;
+    border: 1px solid #444;
+    border-radius: 6px;
+    display: none;
+    width: 150px;
+    z-index: 100;
+  }
+  .settings-dropdown label {
+    display: block;
+    padding: 6px 12px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .settings-dropdown select {
+    width: 100%;
+    background: #333;
+    border: none;
+    color: #eee;
+    border-radius: 4px;
+    margin-top: 4px;
+    margin-bottom: 10px;
+  }
+  .settings-dropdown label:hover {
+    background: #444;
+  }
+</style>
+</head>
+<body>
+  <div class="timecode-window">
+    <div class="header">
+      <div class="status-circle" id="statusCircle" title="Click time to toggle status"></div>
+      <div class="time-display" id="timeDisplay">00:00:00;00</div>
+      <div class="settings">
+        <button class="settings-button" id="settingsButton" title="Settings">⚙️</button>
+        <div class="settings-dropdown" id="settingsDropdown">
+          <label>
+            Audio Device
+            <select id="audioDeviceSelect">
+              <option value="default">Default</option>
+              <option value="device1">Device 1</option>
+              <option value="device2">Device 2</option>
+            </select>
+          </label>
+          <label>
+            Channel
+            <select id="channelSelect">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+            </select>
+          </label>
+          <label>
+            Format
+            <select id="formatSelect">
+              <option value="24">24 fps</option>
+              <option value="25">25 fps</option>
+              <option value="30">30 fps</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="status-text" id="statusText">Not engaged</div>
+  </div>
+
+<script>
+  const timeDisplay = document.getElementById("timeDisplay");
+  const statusText = document.getElementById("statusText");
+  const statusCircle = document.getElementById("statusCircle");
+  const settingsButton = document.getElementById("settingsButton");
+  const settingsDropdown = document.getElementById("settingsDropdown");
+
+  // Status states cycle: not engaged (red) -> stopped (yellow) -> playing (green)
+  const statuses = [
+    { text: "Not engaged", color: "red" },
+    { text: "Stopped", color: "yellow" },
+    { text: "Playing", color: "green" },
+  ];
+  let currentStatus = 0;
+
+  // Click time to cycle status
+  timeDisplay.addEventListener("click", () => {
+    currentStatus = (currentStatus + 1) % statuses.length;
+    updateStatus();
+  });
+
+  function updateStatus() {
+    statusText.textContent = statuses[currentStatus].text;
+    statusCircle.style.background = statuses[currentStatus].color;
+  }
+
+  // Toggle settings dropdown
+  settingsButton.addEventListener("click", () => {
+    if (settingsDropdown.style.display === "block") {
+      settingsDropdown.style.display = "none";
+    } else {
+      settingsDropdown.style.display = "block";
+    }
+  });
+
+  // Click outside closes settings dropdown
+  document.addEventListener("click", (e) => {
+    if (
+      !settingsDropdown.contains(e.target) &&
+      e.target !== settingsButton
+    ) {
+      settingsDropdown.style.display = "none";
+    }
+  });
+
+  // TODO: Here you can add audio device/channel/format logic
+  // For now, just log selected values on change
+  document.getElementById("audioDeviceSelect").addEventListener("change", (e) => {
+    console.log("Audio device selected:", e.target.value);
+  });
+  document.getElementById("channelSelect").addEventListener("change", (e) => {
+    console.log("Channel selected:", e.target.value);
+  });
+  document.getElementById("formatSelect").addEventListener("change", (e) => {
+    console.log("Format selected:", e.target.value);
+  });
+
+  // Initialize
+  updateStatus();
+</script>
+</body>
+</html>

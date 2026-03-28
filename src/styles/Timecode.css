@@ -1,0 +1,92 @@
+.timecode-root {
+  margin: 0;
+  background: #1a1a1a;
+  color: #eee;
+  font-family: Inter, system-ui, sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+  user-select: none;
+}
+
+.timecode-window {
+  width: 180px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.status-circle {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  border-radius: 50%;
+  margin-right: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.time-display {
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  flex-grow: 1;
+  user-select: text;
+}
+
+.status-text {
+  margin-top: 4px;
+  font-size: 14px;
+  text-align: center;
+  height: 20px;
+  user-select: text;
+}
+
+.settings {
+  position: relative;
+}
+
+.settings-button {
+  background: none;
+  border: none;
+  color: #eee;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 0 6px;
+}
+
+.settings-dropdown {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  background: #222;
+  border: 1px solid #444;
+  border-radius: 6px;
+  width: 150px;
+  z-index: 100;
+}
+
+.settings-dropdown label {
+  display: block;
+  padding: 6px 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.settings-dropdown select {
+  width: 100%;
+  background: #333;
+  border: none;
+  color: #eee;
+  border-radius: 4px;
+  margin-top: 4px;
+  margin-bottom: 10px;
+}
+
+.settings-dropdown label:hover {
+  background: #444;
+}

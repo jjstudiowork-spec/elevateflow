@@ -1,0 +1,140 @@
+/**
+ * themes.css — ElevateFlow colour themes
+ * Applied via data-theme attribute on <html>
+ * Import this AFTER tokens.css in app.css
+ */
+
+/* ── Default (Dark — existing look) ──────────────────────────── */
+html[data-theme="dark"] {
+  --accent:        #D4AF37 !important;
+  --accent-faint:  rgba(212,175,55,0.1) !important;
+  --accent-glow:   rgba(212,175,55,0.3) !important;
+}
+
+/* ── Midnight Blue ───────────────────────────────────────────── */
+html[data-theme="midnight"] {
+  --bg-void:        #080c14 !important;
+  --bg-app:         #0d1117 !important;
+  --bg-panel:       #111827 !important;
+  --bg-panel-mid:   #131c2e !important;
+  --bg-surface:     #1a2540 !important;
+  --bg-raised:      #1e2d4a !important;
+  --bg-hover:       #243357 !important;
+  --border-faint:   #1a2235 !important;
+  --border-dim:     #1e3050 !important;
+  --border-normal:  #2a4070 !important;
+  --border-strong:  #3a5080 !important;
+  --text-primary:   #e2e8f0 !important;
+  --text-secondary: #94a3b8 !important;
+  --text-muted:     #64748b !important;
+  --text-dim:       #334155 !important;
+  --text-bright:    #f8fafc !important;
+  --gold-500:       #60a5fa !important;
+  --gold-glow:      rgba(96,165,250,0.4) !important;
+  --accent:         #60a5fa !important;
+  --accent-faint:   rgba(96,165,250,0.1) !important;
+  --accent-glow:    rgba(96,165,250,0.3) !important;
+  --radius-sm:      3px !important;
+  --radius-md:      5px !important;
+  --radius-lg:      8px !important;
+}
+
+/* ── Forest (Deep Green) ─────────────────────────────────────── */
+html[data-theme="forest"] {
+  --bg-void:        #080e0a !important;
+  --bg-app:         #0a120c !important;
+  --bg-panel:       #0f1a11 !important;
+  --bg-panel-mid:   #111e13 !important;
+  --bg-surface:     #172619 !important;
+  --bg-raised:      #1a2e1c !important;
+  --bg-hover:       #1f3622 !important;
+  --border-faint:   #142016 !important;
+  --border-dim:     #1a2e1c !important;
+  --border-normal:  #244028 !important;
+  --border-strong:  #2e5034 !important;
+  --text-primary:   #d1fae5 !important;
+  --text-secondary: #6ee7b7 !important;
+  --text-muted:     #34d399 !important;
+  --text-dim:       #065f46 !important;
+  --text-bright:    #f0fdf4 !important;
+  --gold-500:       #4ade80 !important;
+  --gold-glow:      rgba(74,222,128,0.4) !important;
+  --accent:         #4ade80 !important;
+  --accent-faint:   rgba(74,222,128,0.1) !important;
+  --accent-glow:    rgba(74,222,128,0.3) !important;
+}
+
+/* ── Crimson ─────────────────────────────────────────────────── */
+html[data-theme="crimson"] {
+  --bg-void:        #0e0808 !important;
+  --bg-app:         #120a0a !important;
+  --bg-panel:       #1a0e0e !important;
+  --bg-panel-mid:   #1e1010 !important;
+  --bg-surface:     #2a1414 !important;
+  --bg-raised:      #301818 !important;
+  --bg-hover:       #3a1c1c !important;
+  --border-faint:   #200e0e !important;
+  --border-dim:     #2e1414 !important;
+  --border-normal:  #401a1a !important;
+  --border-strong:  #582020 !important;
+  --text-primary:   #fecaca !important;
+  --text-secondary: #f87171 !important;
+  --text-muted:     #ef4444 !important;
+  --text-dim:       #7f1d1d !important;
+  --text-bright:    #fff1f2 !important;
+  --gold-500:       #f87171 !important;
+  --gold-glow:      rgba(248,113,113,0.4) !important;
+  --accent:         #f87171 !important;
+  --accent-faint:   rgba(248,113,113,0.1) !important;
+  --accent-glow:    rgba(248,113,113,0.3) !important;
+}
+
+/* ── Light ───────────────────────────────────────────────────── */
+html[data-theme="light"] {
+  --bg-void:        #e5e7eb !important;
+  --bg-app:         #f3f4f6 !important;
+  --bg-panel:       #ffffff !important;
+  --bg-panel-mid:   #f9fafb !important;
+  --bg-surface:     #f3f4f6 !important;
+  --bg-raised:      #e5e7eb !important;
+  --bg-hover:       #d1d5db !important;
+  --border-faint:   #e5e7eb !important;
+  --border-dim:     #d1d5db !important;
+  --border-normal:  #9ca3af !important;
+  --border-strong:  #6b7280 !important;
+  --text-primary:   #111827 !important;
+  --text-secondary: #374151 !important;
+  --text-muted:     #6b7280 !important;
+  --text-dim:       #9ca3af !important;
+  --text-bright:    #030712 !important;
+  --gold-500:       #b45309 !important;
+  --gold-glow:      rgba(180,83,9,0.3) !important;
+  --accent:         #b45309 !important;
+  --accent-faint:   rgba(180,83,9,0.08) !important;
+  --accent-glow:    rgba(180,83,9,0.25) !important;
+}
+
+/* ── Graphite ────────────────────────────────────────────────── */
+html[data-theme="graphite"] {
+  --bg-void:        #000000 !important;
+  --bg-app:         #111111 !important;
+  --bg-panel:       #161616 !important;
+  --bg-panel-mid:   #1a1a1a !important;
+  --bg-surface:     #1e1e1e !important;
+  --bg-raised:      #232323 !important;
+  --bg-hover:       #2a2a2a !important;
+  --border-faint:   #1a1a1a !important;
+  --border-dim:     #222222 !important;
+  --border-normal:  #2e2e2e !important;
+  --border-strong:  #3a3a3a !important;
+  --text-primary:   #ffffff !important;
+  --text-secondary: #a0a0a0 !important;
+  --text-muted:     #666666 !important;
+  --text-dim:       #333333 !important;
+  --text-bright:    #ffffff !important;
+  --gold-500:       #ffffff !important;
+  --gold-glow:      rgba(255,255,255,0.2) !important;
+  --accent:         #ffffff !important;
+  --accent-faint:   rgba(255,255,255,0.06) !important;
+  --accent-glow:    rgba(255,255,255,0.15) !important;
+}

@@ -1,0 +1,95 @@
+.graphics-container {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  background-color: #121212;
+  color: #eee;
+  height: 100vh;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.graphics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #333;
+  margin-bottom: 20px;
+}
+
+.graphics-header h2 {
+  margin: 0;
+  font-weight: 600;
+}
+
+.graphics-settings-btn {
+  background: transparent;
+  border: none;
+  color: #eee;
+  font-size: 20px;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.graphics-settings-btn:hover {
+  color: #d6b25e;
+}
+
+.clip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 15px;
+  flex-grow: 1;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+.clip-panel {
+  border-radius: 8px;
+  height: 90px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: 700;
+  color: white;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 0 8px rgba(0,0,0,0.8);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  text-shadow: 0 0 5px rgba(0,0,0,0.8);
+}
+
+.clip-panel:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.9);
+}
+
+.clip-panel.active {
+  outline: 3px solid #d6b25e;
+  box-shadow: 0 0 20px #d6b25e;
+  transform: scale(1.1);
+  z-index: 2;
+}
+
+.clip-preview {
+  margin-top: 20px;
+  border-top: 1px solid #333;
+  padding-top: 15px;
+}
+
+.clip-preview h3 {
+  margin: 0 0 10px 0;
+  font-weight: 600;
+}
+
+.preview-box {
+  height: 150px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 18px;
+  user-select: none;
+}

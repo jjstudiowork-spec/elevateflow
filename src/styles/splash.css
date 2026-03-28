@@ -1,0 +1,11 @@
+/* 
+ * Transparent background for splash/about/close-confirm windows.
+ * Applied via .transparent-window class on the root div,
+ * NOT as a global html/body rule (that would break the main app).
+ */
+.transparent-window {
+  background: transparent !important;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+}

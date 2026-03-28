@@ -1,0 +1,118 @@
+/* CloseConfirm.css */
+
+.premium-overlay {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: transparent;
+  overflow: hidden;
+}
+
+.premium-card {
+  position: relative;
+  background: rgba(10, 10, 10, 0.85); /* Deep obsidian */
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(212, 175, 55, 0.2); /* Subtle Gold border */
+  border-radius: 24px;
+  padding: 40px;
+  width: 340px;
+  text-align: center;
+  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.8);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* The subtle gold pulse behind the icon */
+.premium-glow {
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 150px;
+  height: 150px;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Animations */
+.fade-in {
+  animation: premiumEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes premiumEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.close-win__icon {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 20px;
+  filter: drop-shadow(0 0 10px rgba(212, 175, 55, 0.3));
+}
+
+.close-win__title {
+  color: #FFFFFF;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin-bottom: 12px;
+}
+
+.close-win__body {
+  color: #A0A0A0;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 32px;
+  padding: 0 10px;
+}
+
+.close-win__actions {
+  display: flex;
+  flex-direction: column; /* Stacked for a more modern mobile-luxe feel */
+  gap: 12px;
+}
+
+.premium-btn {
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: none;
+  text-transform: uppercase;
+}
+
+.btn--yes {
+  background: #D4AF37;
+  color: #000;
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.2);
+}
+
+.btn--yes:hover {
+  background: #E5C35E;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
+}
+
+.btn--cancel {
+  background: rgba(255, 255, 255, 0.05);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn--cancel:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
