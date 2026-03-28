@@ -61,13 +61,7 @@ export default function UpdateNotifier({ update, onDismiss }) {
       // Open the DMG download URL in the system browser
       const { open } = await import('@tauri-apps/plugin-opener');
       await open(update.url);
-    } catch {
-      // Fallback — open via shell
-      try {
-        const { Command } = await import('@tauri-apps/plugin-shell');
-        await Command.create('open', [update.url]).execute();
-      } catch {}
-    }
+    } catch {}
     // Dismiss after opening
     setTimeout(onDismiss, 1000);
   };

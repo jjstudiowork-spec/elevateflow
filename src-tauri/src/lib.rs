@@ -166,8 +166,10 @@ pub fn run() {
                 if label == "main" {
                     api.prevent_close();
                     let app = window.app_handle().clone();
-                    // Open the confirm dialog as its own small window
-                    if app.get_webview_window("close-confirm").is_none() {
+                    if let Some(w) = app.get_webview_window("close-confirm") {
+                        let _ = w.show();
+                        let _ = w.set_focus();
+                    } else {
                         let _ = tauri::WebviewWindowBuilder::new(
                             &app,
                             "close-confirm",
@@ -179,10 +181,7 @@ pub fn run() {
                         .center()
                         .always_on_top(true)
                         .decorations(false)
-                        .transparent(true)
                         .build();
-                    } else if let Some(w) = app.get_webview_window("close-confirm") {
-                        let _ = w.set_focus();
                     }
                 }
             }
@@ -396,8 +395,7 @@ pub fn run() {
                         .resizable(false)
                         .center()
                         .decorations(false)
-                        .transparent(true)
-                        .always_on_top(true)
+                                                .always_on_top(true)
                         .build()
                         .unwrap();
                     }
