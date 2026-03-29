@@ -12,7 +12,7 @@
 import { useEffect, useState } from 'react';
 
 // ─── CHANGE THIS to your Netlify site URL after you deploy ───────
-const UPDATE_MANIFEST_URL = 'https://YOUR-SITE-NAME.netlify.app/latest.json';
+const UPDATE_MANIFEST_URL = 'https://elevateflow.netlify.app/latest.json';
 
 // Must match the "version" field in tauri.conf.json
 const CURRENT_VERSION = '0.1.0';
