@@ -49,24 +49,32 @@ function Toggle({ on, onChange }) {
 }
 
 // ── Screen card in sidebar ─────────────────────────────────────
-function ScreenCard({ screen, selected, onClick }) {
+function ScreenCard({ screen, selected, onClick, accentColor = '#D4AF37' }) {
   return (
     <div onClick={onClick} style={{
-      padding: '9px 12px', borderRadius: 7, cursor: 'pointer',
-      background: selected
-        ? 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)'
-        : 'rgba(255,255,255,0.03)',
-      border: selected ? '1px solid #3b82f6' : '1px solid transparent',
+      padding: '10px 12px', borderRadius: 9, cursor: 'pointer',
+      background: selected ? `${accentColor}0d` : 'transparent',
+      border: `1px solid ${selected ? `${accentColor}35` : 'transparent'}`,
       marginBottom: 3, transition: 'all 0.12s',
-      boxShadow: selected ? '0 4px 12px rgba(59,130,246,0.3)' : 'none',
+      boxShadow: selected ? `0 0 0 3px ${accentColor}12` : 'none',
+      display: 'flex', alignItems: 'center', gap: 10,
     }}
-      onMouseEnter={e => { if (!selected) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
-      onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+      onMouseEnter={e => { if (!selected) { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = '#1e1e24'; } }}
+      onMouseLeave={e => { if (!selected) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; } }}
     >
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{screen.name}</div>
-      <div style={{ fontSize: 10, color: selected ? 'rgba(255,255,255,0.6)' : '#444', marginTop: 2, fontFamily: 'monospace' }}>
-        {screen.width} × {screen.height}
-        {screen.isPlaceholder && <span style={{ marginLeft: 6, opacity: 0.6 }}>· Placeholder</span>}
+      <div style={{
+        width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+        background: selected ? accentColor : '#27272a',
+        boxShadow: selected ? `0 0 6px ${accentColor}` : 'none',
+        transition: 'all 0.15s',
+      }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: selected ? '#e4e4e7' : '#71717a' }}>{screen.name}</div>
+        <div style={{ fontSize: 9, color: selected ? '#52525b' : '#27272a', marginTop: 2, fontFamily: 'monospace' }}>
+          {screen.width} × {screen.height}
+          {screen.isPlaceholder && <span style={{ marginLeft: 6 }}>· Placeholder</span>}
+          {screen.isNdi && <span style={{ marginLeft: 6, color: '#4ade80' }}>· NDI</span>}
+        </div>
       </div>
     </div>
   );
@@ -159,22 +167,28 @@ function AddDropdown({ monitors, onAdd, onClose }) {
 // ── Section in sidebar ─────────────────────────────────────────
 function Section({ label, role, enabled, onToggle, screens, selectedId, onSelect, monitors, onAdd, onRemove }) {
   const [showDropdown, setShowDropdown] = useState(false);
+  const color = role === 'audience' ? '#60a5fa' : '#D4AF37';
 
   return (
-    <div style={{ marginBottom: 6 }}>
+    <div style={{ marginBottom: 20 }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 4px 8px', borderBottom: '1px solid #1a1a1a', marginBottom: 6 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '8px 12px', marginBottom: 6,
+        background: 'rgba(255,255,255,0.02)', borderRadius: 8,
+        border: '1px solid #141418',
+      }}>
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}66`, flexShrink: 0 }} />
+        <span style={{ fontSize: 11, fontWeight: 800, color: '#71717a', flex: 1, letterSpacing: 1.5, textTransform: 'uppercase' }}>{label}</span>
         <Toggle on={enabled} onChange={onToggle} />
-        <span style={{ fontSize: 14, fontWeight: 700, color: '#e0e0e0', flex: 1, letterSpacing: 0.2 }}>{label}</span>
         <div style={{ position: 'relative' }}>
           <button
             onClick={() => setShowDropdown(p => !p)}
             style={{
-              width: 22, height: 22, borderRadius: 5, padding: 0,
-              background: 'rgba(255,255,255,0.05)', border: '1px solid #2a2a2a',
-              color: '#888', fontSize: 16, lineHeight: 1, cursor: 'pointer',
+              width: 22, height: 22, borderRadius: 6, padding: 0,
+              background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.2)',
+              color: '#D4AF37', fontSize: 16, lineHeight: 1, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: 'system-ui',
             }}
           >+</button>
           {showDropdown && (
@@ -189,7 +203,7 @@ function Section({ label, role, enabled, onToggle, screens, selectedId, onSelect
 
       {/* Screen cards */}
       {screens.length === 0 ? (
-        <div style={{ padding: '8px 4px', fontSize: 11, color: '#2a2a2a', textAlign: 'center', fontStyle: 'italic' }}>
+        <div style={{ padding: '10px 12px', fontSize: 11, color: '#27272a', textAlign: 'center', fontStyle: 'italic' }}>
           No screens — click + to add
         </div>
       ) : (
@@ -197,6 +211,7 @@ function Section({ label, role, enabled, onToggle, screens, selectedId, onSelect
           <ScreenCard key={s.id} screen={s}
             selected={selectedId === s.id}
             onClick={() => onSelect(s.id)}
+            accentColor={color}
           />
         ))
       )}
@@ -538,17 +553,16 @@ export default function ConfigureScreens() {
 
   return (
     <div style={{
-      display: 'grid', gridTemplateColumns: '260px 1fr', height: '100vh',
-      background: '#161618',
+      display: 'grid', gridTemplateColumns: '280px 1fr', height: '100vh',
+      background: '#0a0a0c',
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", Arial, sans-serif',
       color: '#fff', userSelect: 'none', overflow: 'hidden',
     }}>
 
       {/* ── SIDEBAR ── */}
       <div style={{
-        background: '#1c1c1e', borderRight: '1px solid #0a0a0a',
+        background: '#0e0e12', borderRight: '1px solid #1a1a1e',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        boxShadow: '4px 0 20px rgba(0,0,0,0.4)',
       }}>
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 12px' }}>
           <Section
@@ -572,26 +586,17 @@ export default function ConfigureScreens() {
 
         {/* Bottom */}
         <div style={{
-          padding: '14px 16px', borderTop: '1px solid #0f0f0f',
-          background: '#171719',
+          padding: '14px 16px', borderTop: '1px solid #141418',
+          background: '#0c0c10',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 11, color: '#555', fontWeight: 600 }}>UNDERSCAN</span>
-            <span style={{ fontSize: 11, color: '#D4AF37', fontFamily: 'monospace' }}>{underscan}%</span>
+            <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 2, color: '#3f3f46' }}>UNDERSCAN</span>
+            <span style={{ fontSize: 11, color: '#D4AF37', fontFamily: 'monospace', fontWeight: 700 }}>{underscan}%</span>
           </div>
           <input type="range" min="0" max="20" step="0.5" value={underscan}
             onChange={e => setUnderscan(parseFloat(e.target.value))}
             style={{ width: '100%', accentColor: '#D4AF37', cursor: 'pointer', marginBottom: 10 }}
           />
-          <button style={{
-            width: '100%', height: 28,
-            background: 'rgba(255,255,255,0.03)', border: '1px solid #222',
-            borderRadius: 6, color: '#555', fontSize: 11, cursor: 'pointer',
-            fontFamily: 'system-ui, Arial', transition: 'all 0.15s',
-          }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = '#888'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = '#555'; }}
-          >Test Patterns…</button>
         </div>
       </div>
 
@@ -601,33 +606,28 @@ export default function ConfigureScreens() {
 
           {/* Header */}
           <div style={{
-            padding: '18px 24px 0',
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%)',
-            borderBottom: '1px solid #1a1a1a',
+            padding: '20px 24px 0',
+            background: 'linear-gradient(180deg, rgba(212,175,55,0.03) 0%, transparent 100%)',
+            borderBottom: '1px solid #141418',
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#f0f0f0', letterSpacing: -0.3 }}>{selected.name}</div>
-                <div style={{ fontSize: 12, color: '#3b82f6', marginTop: 3, fontFamily: 'monospace' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#e4e4e7', letterSpacing: -0.3 }}>{selected.name}</div>
+                <div style={{ fontSize: 11, color: '#52525b', marginTop: 4, fontFamily: 'monospace' }}>
                   {selected.width} × {selected.height}
-                  {selected.isPlaceholder && <span style={{ color: '#444', marginLeft: 8 }}>Placeholder</span>}
+                  {selected.isPlaceholder && <span style={{ color: '#3f3f46', marginLeft: 8, background: '#1a1a1e', padding: '1px 6px', borderRadius: 4 }}>Placeholder</span>}
+                  {selected.isNdi && <span style={{ color: '#4ade80', marginLeft: 8, background: 'rgba(74,222,128,0.08)', padding: '1px 6px', borderRadius: 4 }}>NDI</span>}
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 11, color: '#444' }}>Screen Color</span>
-                <div style={{
-                  width: 32, height: 20, background: '#000',
-                  border: '1px solid #333', borderRadius: 4,
-                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.5)',
-                }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {(selected.role === 'audience' ? audienceScreens : stageScreens).length > 1 && (
                   <button
                     onClick={() => removeScreen(selected.id, selected.role)}
                     style={{
-                      height: 26, padding: '0 12px',
-                      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-                      borderRadius: 5, color: '#ef4444', fontSize: 11, cursor: 'pointer',
-                      fontFamily: 'system-ui, Arial',
+                      height: 28, padding: '0 12px',
+                      background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)',
+                      borderRadius: 7, color: '#f87171', fontSize: 11, cursor: 'pointer',
+                      fontFamily: 'system-ui, Arial', fontWeight: 600,
                     }}
                   >Remove</button>
                 )}
@@ -635,14 +635,14 @@ export default function ConfigureScreens() {
             </div>
 
             {/* Tabs */}
-            <div style={{ display: 'flex', gap: 1 }}>
+            <div style={{ display: 'flex', gap: 2 }}>
               {TABS.map(tab => (
                 <button key={tab} onClick={() => setActiveTab(tab)} style={{
-                  padding: '6px 16px', borderRadius: '6px 6px 0 0',
-                  background: activeTab === tab ? '#161618' : 'transparent',
-                  border: activeTab === tab ? '1px solid #222' : '1px solid transparent',
-                  borderBottom: activeTab === tab ? '1px solid #161618' : '1px solid transparent',
-                  color: activeTab === tab ? '#fff' : '#555',
+                  padding: '7px 16px', borderRadius: '8px 8px 0 0',
+                  background: activeTab === tab ? '#0a0a0c' : 'transparent',
+                  border: `1px solid ${activeTab === tab ? '#1a1a1e' : 'transparent'}`,
+                  borderBottom: activeTab === tab ? '1px solid #0a0a0c' : '1px solid transparent',
+                  color: activeTab === tab ? '#e4e4e7' : '#52525b',
                   fontSize: 12, fontWeight: 600, cursor: 'pointer',
                   fontFamily: 'system-ui, Arial', marginBottom: -1,
                   transition: 'color 0.15s',
@@ -659,29 +659,30 @@ export default function ConfigureScreens() {
             {/* Screen preview */}
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: '24px', background: '#111',
-              borderBottom: '1px solid #1a1a1a', flexShrink: 0,
+              padding: '24px', background: '#080808',
+              borderBottom: '1px solid #141418', flexShrink: 0,
             }}>
               <div style={{
                 position: 'relative',
                 aspectRatio: `${selected.width} / ${selected.height}`,
-                maxWidth: 380, maxHeight: 140,
-                background: 'linear-gradient(135deg, #1e1e1e 0%, #161618 100%)',
-                border: '1px solid #2a2a2a',
-                borderRadius: 3,
+                maxWidth: 400, maxHeight: 150,
+                background: '#000',
+                border: '1px solid #1e1e24',
+                borderRadius: 6,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.8)',
+                containerType: 'inline-size',
               }}>
-                <span style={{ fontSize: 11, color: '#2a2a2a', fontWeight: 600 }}>{selected.name}</span>
+                <span style={{ fontSize: '2cqw', color: '#1e1e24', fontWeight: 800, letterSpacing: 1 }}>{selected.name}</span>
                 {/* Corner marks */}
                 {[['0%','0%'],['100%','0%'],['0%','100%'],['100%','100%']].map(([l,t],i) => (
                   <div key={i} style={{
-                    position:'absolute', width:8, height:8,
+                    position:'absolute', width:10, height:10,
                     left:l, top:t,
-                    borderTop: (t==='0%') ? '1px solid #3b82f6' : 'none',
-                    borderBottom: (t==='100%') ? '1px solid #3b82f6' : 'none',
-                    borderLeft: (l==='0%') ? '1px solid #3b82f6' : 'none',
-                    borderRight: (l==='100%') ? '1px solid #3b82f6' : 'none',
+                    borderTop: (t==='0%') ? '1.5px solid #D4AF37' : 'none',
+                    borderBottom: (t==='100%') ? '1.5px solid #D4AF37' : 'none',
+                    borderLeft: (l==='0%') ? '1.5px solid #D4AF37' : 'none',
+                    borderRight: (l==='100%') ? '1.5px solid #D4AF37' : 'none',
                     transform: `translate(${l==='100%'?'-100%':'0'}, ${t==='100%'?'-100%':'0'})`,
                   }}/>
                 ))}
@@ -713,13 +714,21 @@ export default function ConfigureScreens() {
       ) : (
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
-          justifyContent: 'center', color: '#222', gap: 12,
+          justifyContent: 'center', color: '#222', gap: 14, padding: 40,
         }}>
-          <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="#222" strokeWidth="1" strokeLinecap="round">
-            <rect x="2" y="3" width="20" height="14" rx="2"/>
-            <path d="M8 21h8M12 17v4"/>
-          </svg>
-          <div style={{ fontSize: 13, color: '#2a2a2a' }}>Select a screen or click + to add one</div>
+          <div style={{
+            width: 64, height: 64, borderRadius: 18, background: '#111115',
+            border: '1px solid #1a1a1e', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#2a2a35" strokeWidth="1.5" strokeLinecap="round">
+              <rect x="2" y="3" width="20" height="14" rx="2"/>
+              <path d="M8 21h8M12 17v4"/>
+            </svg>
+          </div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#27272a', textAlign: 'center', marginBottom: 6 }}>No screen selected</div>
+            <div style={{ fontSize: 12, color: '#1e1e24', textAlign: 'center' }}>Select a screen from the sidebar or add a new one</div>
+          </div>
         </div>
       )}
     </div>

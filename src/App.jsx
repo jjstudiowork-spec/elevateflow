@@ -24,10 +24,14 @@ import SlideGrid from './components/SlideGrid/SlideGrid';
 import RightPanel from './components/RightPanel/index';
 import MediaBin from './components/MediaBin/MediaBin';
 import EditMode from './components/EditMode/EditMode';
+import PP7Importer from './PP7Importer';
 import TextImport from './TextImport';
 import AIAssistant from './AIAssistant';
 import UpdateNotifier, { useUpdateCheck } from './UpdateNotifier';
 import StageMode from './StageMode';
+import FlowEditor from './FlowEditor';
+import WindowedOutputPicker from './WindowedOutputPicker';
+import TrailerVideo from './TrailerVideo';
 import GraphicsMode from './components/GraphicsMode/GraphicsMode';
 import ThemeEditor from './components/ThemeEditor/ThemeEditor';
 import ImportEfModal from './components/ImportEfModal/ImportEfModal';
@@ -222,6 +226,8 @@ export default function App() {
   const [showPP7Importer,  setShowPP7Importer]  = useState(false);
   const [showTextImport,   setShowTextImport]    = useState(false);
   const [showAI,           setShowAI]           = useState(false);
+  const [showWindowedPicker, setShowWindowedPicker] = useState(false);
+  const [showTrailer,        setShowTrailer]        = useState(false);
   const [update, dismissUpdate] = useUpdateCheck();
 
   const handleTextImport = useCallback(({ title, slides, destType, destId }) => {
@@ -524,6 +530,31 @@ export default function App() {
     );
   }, [slides]);
 
+  // Show trailer after splash — go fullscreen for it
+  useEffect(() => {
+    let unlisten;
+    import('@tauri-apps/api/event').then(({ listen: listenFn }) => {
+      listenFn('splash-done', async () => {
+        try {
+          const { getCurrentWindow } = await import('@tauri-apps/api/window');
+          await getCurrentWindow().setFullscreen(true);
+        } catch {}
+        setShowTrailer(true);
+      }).then(f => { unlisten = f; });
+    });
+    return () => { unlisten?.(); };
+  }, []);
+
+  // Listen for Windowed Output menu item
+  useEffect(() => {
+    let unlisten;
+    import('@tauri-apps/api/event').then(({ listen: listenFn }) => {
+      listenFn('menu-windowed-output', () => setShowWindowedPicker(true))
+        .then(f => { unlisten = f; });
+    });
+    return () => { unlisten?.(); };
+  }, []);
+
   // Timecode trigger — fires a specific slide when TC matches
   useEffect(() => {
     let unlisten;
@@ -675,9 +706,10 @@ export default function App() {
 
   const isEditMode        = state.mode === 'edit';
   const isStageMode       = state.mode === 'stage';
+  const isFlowMode        = state.mode === 'flow';
   const isGraphicsMode    = state.mode === 'graphics';
   const isThemeEditorMode = state.mode === 'theme-editor';
-  const isShowMode        = !isEditMode && !isStageMode && !isGraphicsMode && !isThemeEditorMode;
+  const isShowMode        = !isEditMode && !isStageMode && !isFlowMode && !isGraphicsMode && !isThemeEditorMode;
 
   // ── NDI frame capture loop ────────────────────────────────────
   useEffect(() => {
@@ -773,6 +805,17 @@ export default function App() {
     >
       {/* Audio element is fully uncontrolled — src set imperatively in playTrack */}
       <UpdateNotifier update={update} onDismiss={dismissUpdate} />
+      {showWindowedPicker && <WindowedOutputPicker onClose={() => setShowWindowedPicker(false)} />}
+      {showTrailer && (
+        <TrailerVideo onDone={async () => {
+          setShowTrailer(false);
+          // Exit fullscreen after trailer
+          try {
+            const { getCurrentWindow } = await import('@tauri-apps/api/window');
+            await getCurrentWindow().setFullscreen(false);
+          } catch {}
+        }} />
+      )}
 
       {showAI && (
         <AIAssistant
@@ -877,6 +920,22 @@ export default function App() {
       {isStageMode && (
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <StageMode state={state} dispatch={dispatch} />
+        </div>
+      )}
+
+      {/* ── FLOW MODE ── */}
+      {isFlowMode && (
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <FlowEditor
+            state={state}
+            dispatch={dispatch}
+            slides={slides}
+            onUpdateSlides={(newSlides) => {
+              if (state.activeItemId) {
+                dispatch({ type: 'UPDATE_SONG', payload: { id: state.activeItemId, slides: newSlides } });
+              }
+            }}
+          />
         </div>
       )}
 

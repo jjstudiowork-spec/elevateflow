@@ -83,6 +83,8 @@ fn finish_splash(app: tauri::AppHandle) {
     if let Some(main_win) = app.get_webview_window("main") {
         main_win.show().unwrap();
         main_win.set_focus().unwrap();
+        // Tell main window to play the trailer
+        let _ = main_win.emit("splash-done", ());
     }
     if let Some(splash_win) = app.get_webview_window("splash") {
         splash_win.close().unwrap();
@@ -321,11 +323,18 @@ pub fn run() {
                 .accelerator("Opt+Cmd+1")
                 .build(app)?;
 
+            let windowed_output = MenuItemBuilder::new("Windowed Output")
+                .id("windowed_output")
+                .accelerator("Cmd+3")
+                .build(app)?;
+
             let screens_menu = SubmenuBuilder::new(app, "Screens")
                 .item(&audience)
                 .separator()
                 .item(&stage)
                 .item(&stage_edit)
+                .separator()
+                .item(&windowed_output)
                 .separator()
                 .item(&configure_screens)
                 .build()?;
@@ -475,6 +484,11 @@ pub fn run() {
                         .inner_size(1400.0, 800.0)
                         .build()
                         .unwrap();
+                    }
+                }
+                "windowed_output" => {
+                    if let Some(main_win) = app.get_webview_window("main") {
+                        let _ = main_win.emit("menu-windowed-output", ());
                     }
                 }
                 "view_timecode" => {
