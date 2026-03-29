@@ -24,7 +24,6 @@ import SlideGrid from './components/SlideGrid/SlideGrid';
 import RightPanel from './components/RightPanel/index';
 import MediaBin from './components/MediaBin/MediaBin';
 import EditMode from './components/EditMode/EditMode';
-import PP7Importer from './PP7Importer';
 import TextImport from './TextImport';
 import AIAssistant from './AIAssistant';
 import UpdateNotifier, { useUpdateCheck } from './UpdateNotifier';
