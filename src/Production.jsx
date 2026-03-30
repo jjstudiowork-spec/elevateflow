@@ -122,7 +122,7 @@ function AddModal({ onAdd, onClose }) {
 }
 
 // ── Link Card ─────────────────────────────────────────────────────
-function LinkCard({ link, onOpen, onDelete, onEdit }) {
+function LinkCard({ link, onOpen, onDelete, onEdit, onOpenInline }) {
   const [hovered, setHovered]   = useState(false);
   const [imgError, setImgError] = useState(false);
   const favicon = faviconUrl(link.url);
@@ -150,6 +150,15 @@ function LinkCard({ link, onOpen, onDelete, onEdit }) {
           position: 'absolute', top: 10, right: 10,
           display: 'flex', gap: 4,
         }} onClick={e => e.stopPropagation()}>
+          <button onClick={() => onOpenInline(link)} title="Open in main window" style={{
+            height: 24, padding: '0 8px', borderRadius: 6,
+            background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.2)',
+            color: '#D4AF37', cursor: 'pointer', fontSize: 9, fontWeight: 800,
+            display: 'flex', alignItems: 'center', gap: 3,
+          }}>
+            <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
+            In App
+          </button>
           <button onClick={() => onEdit(link)} style={{
             width: 24, height: 24, borderRadius: 6,
             background: 'rgba(255,255,255,0.06)', border: '1px solid #222',
@@ -257,7 +266,9 @@ export default function Production() {
   });
   const [adding,   setAdding]   = useState(false);
   const [editing,  setEditing]  = useState(null);
-  const [search,   setSearch]   = useState('');
+  const [search,     setSearch]     = useState('');
+  const [inlineUrl,   setInlineUrl]   = useState(null);
+  const [inlineTitle, setInlineTitle] = useState('');
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
@@ -364,11 +375,49 @@ export default function Production() {
                 onOpen={openLink}
                 onDelete={delLink}
                 onEdit={setEditing}
+                onOpenInline={link => { setInlineUrl(link.url); setInlineTitle(link.label); }}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* Inline browser */}
+      {inlineUrl && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 50,
+          display: 'flex', flexDirection: 'column',
+          background: '#0a0a0c',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", Arial, sans-serif',
+        }}>
+          {/* Browser bar */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '8px 12px', background: '#111115',
+            borderBottom: '1px solid #1a1a1e', flexShrink: 0,
+          }}>
+            <button onClick={() => setInlineUrl(null)} style={{
+              height: 28, padding: '0 12px', borderRadius: 6, cursor: 'pointer',
+              background: 'transparent', border: '1px solid #1e1e24',
+              color: '#71717a', fontSize: 12, fontWeight: 600,
+            }}>← Back</button>
+            <div style={{
+              flex: 1, height: 28, background: '#0e0e12', border: '1px solid #1e1e24',
+              borderRadius: 6, display: 'flex', alignItems: 'center',
+              padding: '0 10px', fontSize: 11, color: '#52525b', overflow: 'hidden',
+            }}>{inlineUrl}</div>
+            <span style={{ fontSize: 11, color: '#3f3f46', fontWeight: 600 }}>{inlineTitle}</span>
+          </div>
+          {/* Embedded webview */}
+          <webview
+            key={inlineUrl}
+            src={inlineUrl}
+            style={{ flex: 1, width: '100%', border: 'none' }}
+            allowpopups="true"
+            useragent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+          />
+        </div>
+      )}
 
       {/* Modals */}
       {adding  && <AddModal  onAdd={addLink} onClose={() => setAdding(false)} />}

@@ -84,7 +84,7 @@ function useLasso(gridRef, dispatch, slides) {
 function SlideThumbnail({
   slide, index, isSelected, isDragOver,
   onClick, onContextMenu,
-  onDrop,
+  onDrop, hotkey,
 }) {
   const ref     = useRef(null);
   // Keep handler ref stable — avoids re-registering the drop zone every render
@@ -159,6 +159,13 @@ function SlideThumbnail({
             </span>
           )}
           <div style={{ display:'flex', gap:3, alignItems:'center', marginLeft:'auto' }}>
+            {hotkey && (
+              <span style={{
+                fontSize:8, fontWeight:900, color:'#D4AF37',
+                background:'rgba(212,175,55,0.15)', border:'1px solid rgba(212,175,55,0.3)',
+                borderRadius:3, padding:'1px 4px', letterSpacing:0.5,
+              }}>{hotkey.toUpperCase()}</span>
+            )}
             {slide.triggerAudio && <MusicNoteIcon color="#D4AF37" size={10} />}
             {slide.video && <VideoIcon />}
           </div>
@@ -168,12 +175,51 @@ function SlideThumbnail({
   );
 }
 
+// ── Hotkey Sub-Menu ────────────────────────────────────────────
+const GROUP_HOTKEYS = {
+  'Verse': 'v', 'Chorus': 'c', 'Bridge': 'b', 'Intro': 'i',
+  'Outro': 'o', 'Pre-Chorus': 'p', 'Ending': 'e', 'Tag': 't',
+  'Slide': 's', 'Interlude': 's',
+};
+
+function HotkeySubMenu({ slideId, existingKey, onSetHotkey }) {
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  return (
+    <div className="context-menu context-menu--submenu" style={{ width: 210, padding: 8 }}
+      onMouseEnter={e => e.stopPropagation()}>
+      <div className="context-menu__section-label">ASSIGN HOTKEY</div>
+      {existingKey && (
+        <div className="context-menu__item context-menu__item--danger"
+          onClick={() => onSetHotkey(existingKey, null)}>
+          ✕ Remove [{existingKey.toUpperCase()}]
+        </div>
+      )}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:3, padding:'6px 4px' }}>
+        {letters.map(letter => (
+          <button key={letter} onClick={() => onSetHotkey(letter.toLowerCase(), slideId)}
+            style={{
+              height:26, width:'100%', borderRadius:4, cursor:'pointer',
+              background: existingKey?.toUpperCase()===letter ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.04)',
+              border:`1px solid ${existingKey?.toUpperCase()===letter ? 'rgba(212,175,55,0.5)' : '#222'}`,
+              color: existingKey?.toUpperCase()===letter ? '#D4AF37' : '#888',
+              fontSize:11, fontWeight:700,
+            }}>{letter}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Context Menu ───────────────────────────────────────────────
-function ContextMenu({ menu, onEdit, onDuplicate, onCopy, onCut, onPaste, onSetGroup, onDelete, onAssignTrigger, onRemoveVideo, audioFiles, audioPlaylists }) {
+function ContextMenu({ menu, onEdit, onDuplicate, onCopy, onCut, onPaste, onSetGroup, onDelete, onAssignTrigger, onRemoveVideo, onSetHotkey, currentHotkeys, audioFiles, audioPlaylists }) {
   const [triggerOpen, setTriggerOpen] = useState(false);
   const [musicOpen, setMusicOpen] = useState(false);
   const [filterPlaylist, setFilterPlaylist] = useState(null);
+  const [hotkeyOpen, setHotkeyOpen] = useState(false);
   if (!menu) return null;
+
+  // Find existing hotkey for this slide
+  const existingKey = currentHotkeys ? Object.entries(currentHotkeys).find(([,id]) => id === menu.slideId)?.[0] : null;
 
   const GROUPS = [
     { n:'Verse', c:'#3b82f6' }, { n:'Chorus', c:'#ef4444' }, { n:'Bridge', c:'#a855f7' },
@@ -329,7 +375,7 @@ export default function SlideGrid({
   onDuplicate, onCopy, onCut, onPaste, onSetGroup, onDelete,
   onDragOver, onDropMedia,
   onAssignTrigger, onRemoveVideo,
-  onDragHoverSlide,
+  onDragHoverSlide, onSetHotkey,
   audioFiles, audioPlaylists,
 }) {
   const { selectedSlideId, selectedSlideIds = [], contextMenu, showArrangements, activeArrangement, showTimeline } = state;
@@ -386,6 +432,7 @@ export default function SlideGrid({
               slide={slide} index={i}
               isSelected={slide.id === selectedSlideId || selectedSlideIds.includes(slide.id)}
               isDragOver={dragOverSlideId === slide.id}
+              hotkey={Object.entries(state.hotkeys || {}).find(([,id]) => id === slide.id)?.[0]}
               onClick={() => onSlideClick(slide)}
               onContextMenu={e => { e.preventDefault(); dispatch({ type:'SET_CONTEXT_MENU', payload:{ x:e.clientX, y:e.clientY, slideId:slide.id } }); }}
               onDrop={(data, slideId) => {
@@ -418,6 +465,11 @@ export default function SlideGrid({
           onDelete={() => { onDelete(contextMenu.slideId); closeMenu(); }}
           onRemoveVideo={() => { onRemoveVideo?.(contextMenu.slideId); closeMenu(); }}
           onAssignTrigger={track => { onAssignTrigger(contextMenu.slideId, track); closeMenu(); }}
+          onSetHotkey={(key, slideId) => {
+            onSetHotkey?.(key, slideId);
+            closeMenu();
+          }}
+          currentHotkeys={state.hotkeys || {}}
           audioFiles={audioFiles || []}
           audioPlaylists={audioPlaylists || []}
         />

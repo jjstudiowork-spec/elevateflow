@@ -1,14 +1,14 @@
 /**
  * ThemeEditor.jsx
- * Full-screen theme editor. Drag & resize the text box just like EditMode.
- * Position (x, y, width, height), font, size, colour are all saved to the theme
- * and applied when the theme is used on a slide or in TextImport.
+ * Full-screen theme editor — same UX as EditMode but for a single
+ * "demo slide" that defines a theme's typography style.
+ * Saving writes a custom theme to localStorage.
  */
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 
 const THEME_STORAGE_KEY = 'elevateflow_custom_themes';
 
-export function loadCustomThemes() {
+function loadCustomThemes() {
   try { return JSON.parse(localStorage.getItem(THEME_STORAGE_KEY) || '[]'); }
   catch { return []; }
 }
@@ -16,52 +16,39 @@ function saveCustomThemesToStorage(themes) {
   localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(themes));
 }
 
-// ── Default demo slide ──────────────────────────────────────────
+// ── Default demo slide ─────────────────────────────────────────
 const DEFAULT_DEMO_SLIDE = {
   id: 'theme-editor-demo',
-  text: 'Sample Text',
-  textColor:     '#ffffff',
-  fontFamily:    'Arial, sans-serif',
-  fontSize:      6,
-  fontWeight:    800,
-  italic:        false,
-  underline:     false,
+  text: `AMAZING GRACE
+HOW SWEET THE SOUND`,
+  textColor:    '#ffffff',
+  fontFamily:   'Arial, sans-serif',
+  fontSize:     6,
+  fontWeight:   800,
+  italic:       false,
+  underline:    false,
   strikethrough: false,
-  transform:     'none',
-  lineSpacing:   1.2,
+  transform:    'uppercase',
+  lineSpacing:  1.2,
   x: 50, y: 50, width: 70, height: 40,
 };
 
-// ── Resize handle directions ────────────────────────────────────
-const HANDLES = [
-  { id: 'nw', style: { top: -5, left: -5,             cursor: 'nw-resize' } },
-  { id: 'ne', style: { top: -5, right: -5,            cursor: 'ne-resize' } },
-  { id: 'se', style: { bottom: -5, right: -5,         cursor: 'se-resize' } },
-  { id: 'sw', style: { bottom: -5, left: -5,          cursor: 'sw-resize' } },
-  { id: 'n',  style: { top: -5, left: 'calc(50% - 4px)', cursor: 'n-resize' } },
-  { id: 's',  style: { bottom: -5, left: 'calc(50% - 4px)', cursor: 's-resize' } },
-  { id: 'e',  style: { top: 'calc(50% - 4px)', right: -5,  cursor: 'e-resize' } },
-  { id: 'w',  style: { top: 'calc(50% - 4px)', left: -5,   cursor: 'w-resize' } },
-];
-
-// ── Canvas with drag/resize ─────────────────────────────────────
-function ThemeCanvas({ slide, isTyping, onDoubleClick, onTextBlur, onTextKeyDown, onPositionChange }) {
+// ── Canvas ─────────────────────────────────────────────────────
+function ThemeCanvas({ slide, isTyping, onDoubleClick, onTextBlur, onTextKeyDown, onUpdate }) {
   const editableRef = useRef(null);
-  const canvasRef   = useRef(null);
-  const dragRef     = useRef(null); // { mode, startX, startY, snap }
+  const textBoxRef  = useRef(null);
+  const dragState   = useRef(null);
 
-  // Sync editable content when not typing
   useEffect(() => {
     if (!editableRef.current || isTyping) return;
     editableRef.current.innerText = slide.text || '';
   }, [slide.id, isTyping]);
 
-  // Focus + caret when entering typing mode
   useEffect(() => {
     if (isTyping && editableRef.current) {
       editableRef.current.focus();
       const range = document.createRange();
-      const sel   = window.getSelection();
+      const sel = window.getSelection();
       range.selectNodeContents(editableRef.current);
       range.collapse(false);
       sel.removeAllRanges();
@@ -69,157 +56,113 @@ function ThemeCanvas({ slide, isTyping, onDoubleClick, onTextBlur, onTextKeyDown
     }
   }, [isTyping]);
 
-  const startDrag = useCallback((e, mode) => {
+  // ── Drag textbox (same as EditMode) ────────────────────────
+  const handleObjectMouseDown = useCallback((e) => {
     if (isTyping) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    dragRef.current = {
-      mode,
-      startX:  e.clientX,
-      startY:  e.clientY,
-      rectW:   rect.width,
-      rectH:   rect.height,
-      snap:    { ...slide },   // snapshot of slide at drag start
+    e.stopPropagation(); e.preventDefault();
+    const surface = e.currentTarget.closest('.theme-editor__surface');
+    if (!surface) return;
+    const r = surface.getBoundingClientRect();
+    const mx = ((e.clientX - r.left) / r.width)  * 100;
+    const my = ((e.clientY - r.top)  / r.height) * 100;
+    dragState.current = { surface, ox: mx - (slide.x ?? 50), oy: my - (slide.y ?? 50) };
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'move';
+    const onMove = (ev) => {
+      const dr = dragState.current?.surface.getBoundingClientRect();
+      if (!dr) return;
+      let nx = ((ev.clientX - dr.left) / dr.width)  * 100 - dragState.current.ox;
+      let ny = ((ev.clientY - dr.top)  / dr.height) * 100 - dragState.current.oy;
+      if (Math.abs(nx - 50) < 1.5) nx = 50;
+      if (Math.abs(ny - 50) < 1.5) ny = 50;
+      dragState.current.nx = nx; dragState.current.ny = ny;
+      if (textBoxRef.current) { textBoxRef.current.style.left = nx + '%'; textBoxRef.current.style.top = ny + '%'; }
     };
-  }, [isTyping, slide]);
-
-  useEffect(() => {
-    const onMove = (e) => {
-      if (!dragRef.current) return;
-      const { mode, startX, startY, rectW, rectH, snap } = dragRef.current;
-      const dx = (e.clientX - startX) / rectW * 100;
-      const dy = (e.clientY - startY) / rectH * 100;
-
-      let { x, y, width, height } = snap;
-      // Snapping to centre
-      let nx = x, ny = y, nw = width, nh = height;
-
-      if (mode === 'move') {
-        nx = snap.x + dx;
-        ny = snap.y + dy;
-        if (Math.abs(nx - 50) < 1.5) nx = 50;
-        if (Math.abs(ny - 50) < 1.5) ny = 50;
-      } else {
-        // Derive box edges from centre + half-size
-        const r = x + width / 2, l = x - width / 2;
-        const b = y + height / 2, t = y - height / 2;
-
-        let newR = r, newL = l, newT = t, newB = b;
-        if (mode.includes('e')) newR = r + dx;
-        if (mode.includes('w')) newL = l + dx;
-        if (mode.includes('s')) newB = b + dy;
-        if (mode.includes('n')) newT = t + dy;
-
-        nw = Math.max(10, newR - newL);
-        nh = Math.max(5,  newB - newT);
-        nx = newL + nw / 2;
-        ny = newT + nh / 2;
-      }
-
-      onPositionChange({ x: nx, y: ny, width: nw, height: nh });
-    };
-
-    const onUp = () => { dragRef.current = null; };
-
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup',   onUp);
-    return () => {
+    const onUp = () => {
       window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup',   onUp);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.userSelect = ''; document.body.style.cursor = '';
+      if (dragState.current?.nx !== undefined) { onUpdate('x', dragState.current.nx); onUpdate('y', dragState.current.ny); }
+      dragState.current = null;
     };
-  }, [onPositionChange]);
+    window.addEventListener('mousemove', onMove, { passive: true });
+    window.addEventListener('mouseup', onUp);
+  }, [isTyping, slide.x, slide.y, onUpdate]);
 
-  const textDecoration = [
-    slide.underline     && 'underline',
-    slide.strikethrough && 'line-through',
-  ].filter(Boolean).join(' ') || 'none';
+  // ── Resize handles ──────────────────────────────────────────
+  const handleResizeMouseDown = useCallback((handle, e) => {
+    e.stopPropagation(); e.preventDefault();
+    const surface = textBoxRef.current?.closest('.theme-editor__surface');
+    if (!surface) return;
+    const ox = slide.x ?? 50, oy = slide.y ?? 50;
+    const ow = slide.width ?? 70, oh = slide.height ?? 40;
+    const r2 = ox + ow/2, l = ox - ow/2, b = oy + oh/2, t = oy - oh/2;
+    document.body.style.userSelect = 'none';
+    const onMove = (ev) => {
+      const dr = surface.getBoundingClientRect();
+      let mx = ((ev.clientX - dr.left) / dr.width) * 100;
+      let my = ((ev.clientY - dr.top)  / dr.height) * 100;
+      let nx = ox, ny = oy, nw = ow, nh = oh;
+      if (handle.includes('e')) { nw = Math.max(5, mx - l); nx = l + nw/2; }
+      if (handle.includes('w')) { nw = Math.max(5, r2 - mx); nx = r2 - nw/2; }
+      if (handle.includes('s')) { nh = Math.max(5, my - t); ny = t + nh/2; }
+      if (handle.includes('n')) { nh = Math.max(5, b - my); ny = b - nh/2; }
+      if (textBoxRef.current) { textBoxRef.current.style.left = nx+'%'; textBoxRef.current.style.top = ny+'%'; textBoxRef.current.style.width = nw+'%'; textBoxRef.current.style.height = nh+'%'; }
+      dragState.current = { nx, ny, nw, nh };
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.userSelect = '';
+      if (dragState.current) { const { nx, ny, nw, nh } = dragState.current; onUpdate('x', nx); onUpdate('y', ny); onUpdate('width', nw); onUpdate('height', nh); dragState.current = null; }
+    };
+    window.addEventListener('mousemove', onMove, { passive: true });
+    window.addEventListener('mouseup', onUp);
+  }, [slide, onUpdate]);
+
+  const HANDLES = ['n','s','e','w','ne','nw','se','sw'];
 
   return (
     <div className="theme-editor__canvas">
-      <div
-        ref={canvasRef}
-        className="theme-editor__canvas-inner"
-        style={{ aspectRatio: '16/9', containerType: 'inline-size', position: 'relative' }}
-      >
-        {/* Background */}
+      <div className="theme-editor__canvas-inner theme-editor__surface" style={{ aspectRatio: '16/9', containerType: 'inline-size', position: 'relative' }}>
         <div className="theme-editor__canvas-bg" />
 
-        {/* Smart guides */}
-        {dragRef.current?.mode === 'move' && Math.abs(slide.x - 50) < 1.5 && (
-          <div className="smart-guide smart-guide--v" />
-        )}
-        {dragRef.current?.mode === 'move' && Math.abs(slide.y - 50) < 1.5 && (
-          <div className="smart-guide smart-guide--h" />
-        )}
-
-        {/* Draggable text box */}
         <div
+          ref={textBoxRef}
           className={`text-box ${!isTyping ? 'text-box--selected' : ''}`}
-          style={{
-            left:      `${slide.x}%`,
-            top:       `${slide.y}%`,
-            width:     `${slide.width}%`,
-            height:    `${slide.height}%`,
-            transform: 'translate(-50%, -50%)',
-            cursor:    isTyping ? 'text' : 'move',
-          }}
-          onMouseDown={e => startDrag(e, 'move')}
+          style={{ left: `${slide.x ?? 50}%`, top: `${slide.y ?? 50}%`, width: `${slide.width ?? 70}%`, height: `${slide.height ?? 40}%`, transform: 'translate(-50%, -50%)', cursor: isTyping ? 'text' : 'move' }}
+          onMouseDown={handleObjectMouseDown}
           onDoubleClick={onDoubleClick}
         >
-          {/* Editable text */}
           <div
             ref={editableRef}
             contentEditable={isTyping}
             suppressContentEditableWarning
             className={`text-box__content ${isTyping ? 'text-box__content--editing' : ''}`}
-            style={{
-              color:          slide.textColor  || '#fff',
-              fontWeight:     slide.fontWeight || 800,
-              fontSize:       `${slide.fontSize || 6}cqw`,
-              fontFamily:     slide.fontFamily || 'Arial, sans-serif',
-              textTransform:  slide.transform  || 'none',
-              fontStyle:      slide.italic ? 'italic' : 'normal',
-              lineHeight:     slide.lineSpacing || 1.2,
-              whiteSpace:     'pre-wrap',
-              textDecoration,
-              pointerEvents:  isTyping ? 'auto' : 'none',
-              outline:        'none',
-            }}
+            style={{ color: slide.textColor || '#fff', fontWeight: slide.fontWeight || 800, fontSize: `${slide.fontSize || 6}cqw`, fontFamily: slide.fontFamily || 'Arial, sans-serif', textTransform: slide.transform || 'none', fontStyle: slide.italic ? 'italic' : 'normal', lineHeight: slide.lineSpacing || 1.2, whiteSpace: 'pre-wrap', textDecoration: [slide.underline && 'underline', slide.strikethrough && 'line-through'].filter(Boolean).join(' ') || 'none', pointerEvents: isTyping ? 'auto' : 'none', outline: 'none' }}
             onBlur={onTextBlur}
             onKeyDown={onTextKeyDown}
-            onPaste={e => {
-              e.preventDefault();
-              document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
-            }}
+            onPaste={e => { e.preventDefault(); document.execCommand('insertText', false, e.clipboardData.getData('text/plain')); }}
           />
-
-          {/* Resize handles — only when selected and not typing */}
-          {!isTyping && HANDLES.map(({ id, style }) => (
-            <div
-              key={id}
-              className="transform-handle"
-              style={{ ...style, position: 'absolute', width: 8, height: 8 }}
-              onMouseDown={e => startDrag(e, id)}
-            />
+          {/* Resize handles */}
+          {!isTyping && HANDLES.map(h => (
+            <div key={h} onMouseDown={e => handleResizeMouseDown(h, e)}
+              className={`text-box__handle text-box__handle--${h}`} />
           ))}
         </div>
 
-        <div className="theme-editor__canvas-hint" style={{ pointerEvents: 'none' }}>
-          {isTyping ? 'Press Esc to finish editing' : 'Drag to reposition · Double-click to edit text'}
-        </div>
+        <div className="theme-editor__canvas-hint">Drag to move · Drag edges to resize · Double-click to edit text</div>
       </div>
     </div>
   );
 }
 
-// ── Inspector ───────────────────────────────────────────────────
+// ── Inspector (same Text inspector as EditMode) ─────────────────
 function ThemeInspector({ slide, onUpdate }) {
-  const [systemFonts, setSystemFonts] = useState([]);
-  const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [systemFonts, setSystemFonts] = React.useState([]);
+  const [fontsLoaded, setFontsLoaded] = React.useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     import('@tauri-apps/api/core').then(({ invoke }) => {
       invoke('get_system_fonts')
         .then(fonts => { setSystemFonts(fonts); setFontsLoaded(true); })
@@ -228,8 +171,8 @@ function ThemeInspector({ slide, onUpdate }) {
   }, []);
 
   const FALLBACK_FONTS = [
-    'Arial','Helvetica','Georgia','Times New Roman',
-    'Courier New','Impact','Verdana','Trebuchet MS','Inter','Poppins',
+    'Arial', 'Helvetica', 'Georgia', 'Times New Roman',
+    'Courier New', 'Impact', 'Verdana', 'Trebuchet MS',
   ];
   const fontList = fontsLoaded && systemFonts.length > 0 ? systemFonts : FALLBACK_FONTS;
   const currentFamily = (slide.fontFamily || 'Arial, sans-serif')
@@ -241,34 +184,17 @@ function ThemeInspector({ slide, onUpdate }) {
         <button className="inspector__tab inspector__tab--active">Typography</button>
       </div>
       <div className="inspector__body">
-
-        {/* Position readout */}
-        <div className="inspector-group">
-          <div className="inspector-group__label">POSITION</div>
-          <div className="inspector-prop-grid">
-            {[
-              { k: 'x',      label: 'X',  v: Math.round(slide.x)      },
-              { k: 'y',      label: 'Y',  v: Math.round(slide.y)      },
-              { k: 'width',  label: 'W',  v: Math.round(slide.width)  },
-              { k: 'height', label: 'H',  v: Math.round(slide.height) },
-            ].map(({ k, label, v }) => (
-              <div key={k} className="prop-box">
-                <span className="prop-box__label">{label}</span>
-                <span className="prop-box__value">{v}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
         <div className="inspector-group">
           <div className="inspector-group__label">FONT</div>
 
           <div className="inspector-field">
             <label className="inspector-field__label">
-              Family {!fontsLoaded && <span style={{ color:'#333', fontWeight:400 }}>loading…</span>}
+              Family {!fontsLoaded && <span style={{ color: '#333', fontWeight: 400 }}>loading…</span>}
             </label>
-            <select className="inspector-select" value={currentFamily}
-              onChange={e => onUpdate('fontFamily', e.target.value)}>
+            <select className="inspector-select"
+              value={currentFamily}
+              onChange={e => onUpdate('fontFamily', e.target.value)}
+            >
               {fontList.map(name => (
                 <option key={name} value={name} style={{ fontFamily: name }}>{name}</option>
               ))}
@@ -289,7 +215,7 @@ function ThemeInspector({ slide, onUpdate }) {
           </div>
 
           <div className="inspector-field">
-            <label className="inspector-field__label">Line Spacing</label>
+            <label className="inspector-field__label">Spacing</label>
             <div className="inspector-slider-row">
               <input type="range" min="0.8" max="3" step="0.05" className="inspector-slider"
                 value={slide.lineSpacing || 1.2}
@@ -301,10 +227,14 @@ function ThemeInspector({ slide, onUpdate }) {
           <div className="inspector-group__label" style={{ marginTop: 12 }}>FORMATTING</div>
           <div className="inspector-format-grid">
             {[
-              { label:'B', style:{ fontWeight:800 },          active: slide.fontWeight===800,  onClick:()=>onUpdate('fontWeight', slide.fontWeight===800?400:800) },
-              { label:'I', style:{ fontStyle:'italic' },      active: slide.italic,            onClick:()=>onUpdate('italic',     !slide.italic) },
-              { label:'U', style:{ textDecoration:'underline'},active: slide.underline,         onClick:()=>onUpdate('underline',  !slide.underline) },
-              { label:'S', style:{ textDecoration:'line-through'},active:slide.strikethrough,   onClick:()=>onUpdate('strikethrough',!slide.strikethrough) },
+              { label: 'B', style: { fontWeight: 800 }, active: slide.fontWeight === 800,
+                onClick: () => onUpdate('fontWeight', slide.fontWeight === 800 ? 400 : 800) },
+              { label: 'I', style: { fontStyle: 'italic' }, active: slide.italic,
+                onClick: () => onUpdate('italic', !slide.italic) },
+              { label: 'U', style: { textDecoration: 'underline' }, active: slide.underline,
+                onClick: () => onUpdate('underline', !slide.underline) },
+              { label: 'S', style: { textDecoration: 'line-through' }, active: slide.strikethrough,
+                onClick: () => onUpdate('strikethrough', !slide.strikethrough) },
             ].map(({ label, style, active, onClick }) => (
               <button key={label}
                 className={`format-btn ${active ? 'format-btn--active' : ''}`}
@@ -315,8 +245,10 @@ function ThemeInspector({ slide, onUpdate }) {
 
           <div className="inspector-field" style={{ marginTop: 12 }}>
             <label className="inspector-field__label">Transform</label>
-            <select className="inspector-select" value={slide.transform || 'none'}
-              onChange={e => onUpdate('transform', e.target.value)}>
+            <select className="inspector-select"
+              value={slide.transform || 'none'}
+              onChange={e => onUpdate('transform', e.target.value)}
+            >
               <option value="none">None</option>
               <option value="uppercase">UPPERCASE</option>
               <option value="lowercase">lowercase</option>
@@ -325,7 +257,7 @@ function ThemeInspector({ slide, onUpdate }) {
           </div>
 
           <div className="inspector-field">
-            <label className="inspector-field__label">Text Color</label>
+            <label className="inspector-field__label">Color</label>
             <div className="inspector-color-row">
               <input type="color" className="inspector-color-picker"
                 value={slide.textColor || '#ffffff'}
@@ -336,26 +268,62 @@ function ThemeInspector({ slide, onUpdate }) {
             </div>
           </div>
         </div>
+
+        {/* Position & Size */}
+        <div className="inspector-group">
+          <div className="inspector-group__label">TEXT BOX POSITION</div>
+          <div className="inspector-field">
+            <label className="inspector-field__label">X %</label>
+            <div className="inspector-slider-row">
+              <input type="range" min="0" max="100" step="1" className="inspector-slider"
+                value={slide.x ?? 50}
+                onChange={e => onUpdate('x', parseInt(e.target.value))} />
+              <span className="inspector-slider-value">{slide.x ?? 50}</span>
+            </div>
+          </div>
+          <div className="inspector-field">
+            <label className="inspector-field__label">Y %</label>
+            <div className="inspector-slider-row">
+              <input type="range" min="0" max="100" step="1" className="inspector-slider"
+                value={slide.y ?? 50}
+                onChange={e => onUpdate('y', parseInt(e.target.value))} />
+              <span className="inspector-slider-value">{slide.y ?? 50}</span>
+            </div>
+          </div>
+          <div className="inspector-group__label" style={{ marginTop: 10 }}>TEXT BOX SIZE</div>
+          <div className="inspector-field">
+            <label className="inspector-field__label">Width %</label>
+            <div className="inspector-slider-row">
+              <input type="range" min="10" max="100" step="1" className="inspector-slider"
+                value={slide.width ?? 70}
+                onChange={e => onUpdate('width', parseInt(e.target.value))} />
+              <span className="inspector-slider-value">{slide.width ?? 70}</span>
+            </div>
+          </div>
+          <div className="inspector-field">
+            <label className="inspector-field__label">Height %</label>
+            <div className="inspector-slider-row">
+              <input type="range" min="5" max="100" step="1" className="inspector-slider"
+                value={slide.height ?? 40}
+                onChange={e => onUpdate('height', parseInt(e.target.value))} />
+              <span className="inspector-slider-value">{slide.height ?? 40}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Main ThemeEditor ────────────────────────────────────────────
+// ── Main ThemeEditor ───────────────────────────────────────────
 export default function ThemeEditor({ dispatch }) {
-  const [slide,     setSlide]     = useState({ ...DEFAULT_DEMO_SLIDE });
-  const [isTyping,  setIsTyping]  = useState(false);
+  const [slide, setSlide]       = useState({ ...DEFAULT_DEMO_SLIDE });
+  const [isTyping, setIsTyping] = useState(false);
   const [themeName, setThemeName] = useState('');
-  const [saved,     setSaved]     = useState(false);
+  const [saved, setSaved]       = useState(false);
 
   const update = useCallback((key, val) => {
     setSlide(prev => ({ ...prev, [key]: val }));
-    setSaved(false);
-  }, []);
-
-  // Batch position update from drag
-  const handlePositionChange = useCallback(({ x, y, width, height }) => {
-    setSlide(prev => ({ ...prev, x, y, width, height }));
     setSaved(false);
   }, []);
 
@@ -367,15 +335,14 @@ export default function ThemeEditor({ dispatch }) {
   const handleTextKeyDown = useCallback((e) => {
     e.stopPropagation();
     if (e.key === 'Escape') { update('text', e.currentTarget.innerText); setIsTyping(false); return; }
-    if (e.key === 'Enter')  { e.preventDefault(); document.execCommand('insertText', false, '\n'); }
+    if (e.key === 'Enter') { e.preventDefault(); document.execCommand('insertText', false, '\n'); }
   }, [update]);
 
   const handleSave = useCallback(() => {
     const name = themeName.trim() || 'Custom Theme';
     const newTheme = {
-      id:            `custom-${Date.now()}`,
+      id: `custom-${Date.now()}`,
       name,
-      // Typography
       fontFamily:    slide.fontFamily,
       fontSize:      slide.fontSize,
       fontWeight:    slide.fontWeight,
@@ -385,25 +352,28 @@ export default function ThemeEditor({ dispatch }) {
       underline:     slide.underline,
       strikethrough: slide.strikethrough,
       lineSpacing:   slide.lineSpacing,
-      // Position — applied to slides when theme is used
-      x:             slide.x,
-      y:             slide.y,
-      width:         slide.width,
-      height:        slide.height,
+      // Position & size
+      x:      slide.x,
+      y:      slide.y,
+      width:  slide.width,
+      height: slide.height,
     };
     const existing = loadCustomThemes();
     saveCustomThemesToStorage([...existing, newTheme]);
     setSaved(true);
+    // Go back to show mode
     setTimeout(() => dispatch({ type: 'SET_MODE', payload: 'show' }), 700);
   }, [slide, themeName, dispatch]);
 
   return (
     <div className="theme-editor">
 
-      {/* Top bar */}
+      {/* ── Top bar ── */}
       <div className="theme-editor__topbar">
-        <button className="theme-editor__back"
-          onClick={() => dispatch({ type: 'SET_MODE', payload: 'show' })}>
+        <button
+          className="theme-editor__back"
+          onClick={() => dispatch({ type: 'SET_MODE', payload: 'show' })}
+        >
           ← Back
         </button>
 
@@ -428,7 +398,7 @@ export default function ThemeEditor({ dispatch }) {
         </div>
       </div>
 
-      {/* Body */}
+      {/* ── Body ── */}
       <div className="theme-editor__body">
         <ThemeCanvas
           slide={slide}
@@ -436,7 +406,7 @@ export default function ThemeEditor({ dispatch }) {
           onDoubleClick={() => setIsTyping(true)}
           onTextBlur={handleTextBlur}
           onTextKeyDown={handleTextKeyDown}
-          onPositionChange={handlePositionChange}
+          onUpdate={update}
         />
         <ThemeInspector slide={slide} onUpdate={update} />
       </div>

@@ -201,12 +201,23 @@ export default function AudienceView() {
       }}>
 
       {/* ── Background video / image ── */}
-      {videoSrc && (
+      {videoSrc && videoPath?.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/i) ? (
+        <img
+          key={videoSrc}
+          src={videoSrc}
+          style={{
+            position: 'absolute', inset: 0,
+            width: '100%', height: '100%',
+            objectFit: slide.videoFit || 'cover', zIndex: 1,
+            animation: `ef-fade-in ${slide.fadeDuration ?? 0.5}s ease forwards`,
+          }}
+        />
+      ) : videoSrc ? (
         <video
           key={videoSrc}
           src={videoSrc}
           autoPlay loop playsInline
-          muted  // Audio plays from main window to avoid doubling across multiple audience windows
+          muted
           ref={el => { if (el) el.volume = 0; }}
           style={{
             position: 'absolute', inset: 0,
@@ -215,7 +226,7 @@ export default function AudienceView() {
             animation: `ef-fade-in ${slide.fadeDuration ?? 0.5}s ease forwards`,
           }}
         />
-      )}
+      ) : null}
 
       {/* ── Text layer ── */}
       <div style={{

@@ -232,10 +232,17 @@ pub fn run() {
                 .id("new_library")
                 .build(app)?;
 
+            let import_ef = MenuItemBuilder::new("Import Song (.ef)…")
+                .id("import_ef")
+                .accelerator("Cmd+Shift+I")
+                .build(app)?;
+
             let file_menu = SubmenuBuilder::new(app, "File")
                 .item(&new_presentation)
                 .item(&new_playlist)
                 .item(&new_library)
+                .separator()
+                .item(&import_ef)
                 .build()?;
 
             // -------- Edit --------
@@ -407,6 +414,11 @@ pub fn run() {
                                                 .always_on_top(true)
                         .build()
                         .unwrap();
+                    }
+                }
+                "import_ef" => {
+                    if let Some(main_win) = app.get_webview_window("main") {
+                        let _ = main_win.emit("menu-import-ef", ());
                     }
                 }
                 "audience" => {

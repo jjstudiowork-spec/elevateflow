@@ -32,8 +32,9 @@ function saveCustomThemes(themes) {
 }
 
 // ── Theme preview card ─────────────────────────────────────────
-function ThemeCard({ theme, onApply, onDelete, isCustom }) {
+function ThemeCard({ theme, onApply, onDelete, isCustom, onEdit }) {
   const [hovered, setHovered] = useState(false);
+  const previewText = theme.text || 'AMAZING\nGRACE';
   return (
     <div
       className="theme-card"
@@ -42,26 +43,38 @@ function ThemeCard({ theme, onApply, onDelete, isCustom }) {
       onClick={() => onApply(theme)}
       title={`Apply "${theme.name}"`}
     >
-      {/* Preview surface */}
-      <div className="theme-card__preview" style={{ background: '#0a0a0a' }}>
-        <span style={{
-          fontFamily:    theme.fontFamily,
-          fontSize:      `${Math.min(theme.fontSize, 8) * 2.2}px`,
-          fontWeight:    theme.fontWeight,
-          color:         theme.textColor,
-          fontStyle:     theme.italic ? 'italic' : 'normal',
-          textTransform: theme.transform || 'none',
-          lineHeight:    theme.lineSpacing || 1.2,
-          textAlign:     'center',
-          display:       'block',
-          padding:       '0 6px',
-          overflow:      'hidden',
-          whiteSpace:    'nowrap',
-          textOverflow:  'ellipsis',
-          maxWidth:      '100%',
+      {/* Real slide preview */}
+      <div className="theme-card__preview" style={{ background: '#000', position: 'relative', overflow: 'hidden', containerType: 'inline-size' }}>
+        <div style={{
+          position: 'absolute',
+          left:   `${theme.x ?? 50}%`,
+          top:    `${theme.y ?? 50}%`,
+          width:  `${theme.width ?? 70}%`,
+          height: `${theme.height ?? 40}%`,
+          transform: 'translate(-50%, -50%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          overflow: 'hidden',
         }}>
-          Aa
-        </span>
+          <span style={{
+            fontFamily:    theme.fontFamily || 'Arial, sans-serif',
+            fontSize:      `${theme.fontSize || 6}cqw`,
+            fontWeight:    theme.fontWeight || 800,
+            color:         theme.textColor  || '#fff',
+            fontStyle:     theme.italic ? 'italic' : 'normal',
+            textTransform: theme.transform  || 'none',
+            lineHeight:    theme.lineSpacing || 1.2,
+            textAlign:     'center',
+            whiteSpace:    'pre-wrap',
+            display:       'block',
+            overflow:      'hidden',
+            textDecoration: [
+              theme.underline     && 'underline',
+              theme.strikethrough && 'line-through',
+            ].filter(Boolean).join(' ') || 'none',
+          }}>
+            {previewText}
+          </span>
+        </div>
       </div>
       {/* Label row */}
       <div className="theme-card__label">
@@ -80,7 +93,159 @@ function ThemeCard({ theme, onApply, onDelete, isCustom }) {
   );
 }
 
-// ── Output Button ─────────────────────────────────────────────
+// ── Themes panel ───────────────────────────────────────────────
+function ThemesPanel({ state, dispatch, onClose, updateSlideStyle, selectedSlide }) {
+  const [customThemes, setCustomThemes] = useState(loadCustomThemes);
+  const [themeName, setThemeName]       = useState('');
+  const [editingTheme, setEditingTheme] = useState(null); // theme being edited
+
+  const applyTheme = useCallback((theme) => {
+    if (!selectedSlide) return;
+    const keys = ['fontFamily','fontSize','fontWeight','textColor','transform',
+                  'italic','underline','strikethrough','lineSpacing','x','y','width','height'];
+    const updates = {};
+    keys.forEach(k => { if (theme[k] !== undefined) updates[k] = theme[k]; });
+    dispatch({ type: 'APPLY_THEME_TO_ALL', payload: updates });
+    onClose();
+  }, [selectedSlide, dispatch, onClose]);
+
+  const saveCurrentAsTheme = useCallback(() => {
+    if (!selectedSlide) return;
+    const name = themeName.trim() || 'My Theme';
+    if (editingTheme) {
+      // Update existing custom theme
+      const next = customThemes.map(t => t.id === editingTheme.id
+        ? { ...t, name,
+            text:          selectedSlide.text?.split('\n').slice(0,2).join('\n') || 'Sample',
+            fontFamily:    selectedSlide.fontFamily || 'Arial, sans-serif',
+            fontSize:      selectedSlide.fontSize   || 6,
+            fontWeight:    selectedSlide.fontWeight || 800,
+            textColor:     selectedSlide.textColor  || '#ffffff',
+            transform:     selectedSlide.transform  || 'none',
+            italic:        selectedSlide.italic     || false,
+            underline:     selectedSlide.underline  || false,
+            strikethrough: selectedSlide.strikethrough || false,
+            lineSpacing:   selectedSlide.lineSpacing || 1.2,
+            x:             selectedSlide.x,
+            y:             selectedSlide.y,
+            width:         selectedSlide.width,
+            height:        selectedSlide.height,
+          }
+        : t
+      );
+      setCustomThemes(next);
+      saveCustomThemes(next);
+      setEditingTheme(null);
+    } else {
+      const newTheme = {
+        id: `custom-${Date.now()}`, name,
+        text:          selectedSlide.text?.split('\n').slice(0,2).join('\n') || 'Sample',
+        fontFamily:    selectedSlide.fontFamily    || 'Arial, sans-serif',
+        fontSize:      selectedSlide.fontSize      || 6,
+        fontWeight:    selectedSlide.fontWeight    || 800,
+        textColor:     selectedSlide.textColor     || '#ffffff',
+        transform:     selectedSlide.transform     || 'none',
+        italic:        selectedSlide.italic        || false,
+        underline:     selectedSlide.underline     || false,
+        strikethrough: selectedSlide.strikethrough || false,
+        lineSpacing:   selectedSlide.lineSpacing   || 1.2,
+        x:             selectedSlide.x,
+        y:             selectedSlide.y,
+        width:         selectedSlide.width,
+        height:        selectedSlide.height,
+      };
+      const next = [...customThemes, newTheme];
+      setCustomThemes(next);
+      saveCustomThemes(next);
+    }
+    setThemeName('');
+  }, [selectedSlide, customThemes, themeName, editingTheme]);
+
+  const deleteTheme = useCallback((id) => {
+    const next = customThemes.filter(t => t.id !== id);
+    setCustomThemes(next);
+    saveCustomThemes(next);
+    if (editingTheme?.id === id) setEditingTheme(null);
+  }, [customThemes, editingTheme]);
+
+  const startEdit = (theme) => {
+    setEditingTheme(theme);
+    setThemeName(theme.name);
+  };
+
+  return (
+    <div className="themes-panel">
+      <div className="themes-panel__header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ThemesIcon />
+          <span className="themes-panel__title">THEMES</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            onClick={() => { onClose(); dispatch({ type: 'SET_MODE', payload: 'theme-editor' }); }}
+            style={{
+              height: 24, padding: '0 10px', borderRadius: 5, cursor: 'pointer',
+              background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.3)',
+              color: '#D4AF37', fontSize: 10, fontWeight: 800,
+            }}>+ Add Theme</button>
+          <button className="themes-panel__close" onClick={onClose}>✕</button>
+        </div>
+      </div>
+
+      {!selectedSlide && (
+        <div className="themes-panel__hint">Select a slide to apply a theme</div>
+      )}
+
+      <div className="themes-panel__section-label">BUILT-IN</div>
+      <div className="themes-panel__grid">
+        {BUILTIN_THEMES.map(t => (
+          <ThemeCard key={t.id} theme={t} onApply={applyTheme} isCustom={false} onDelete={() => {}} />
+        ))}
+      </div>
+
+      {customThemes.length > 0 && (
+        <>
+          <div className="themes-panel__section-label">CUSTOM</div>
+          <div className="themes-panel__grid">
+            {customThemes.map(t => (
+              <ThemeCard key={t.id} theme={t} onApply={applyTheme} isCustom
+                onDelete={deleteTheme}
+                onEdit={() => startEdit(t)}
+                isEditing={editingTheme?.id === t.id}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      <div className="themes-panel__save">
+        <div className="themes-panel__section-label">
+          {editingTheme ? `EDITING "${editingTheme.name.toUpperCase()}"` : 'SAVE CURRENT STYLE AS THEME'}
+          {editingTheme && (
+            <button onClick={() => { setEditingTheme(null); setThemeName(''); }}
+              style={{ marginLeft: 8, fontSize: 10, color: '#555', background: 'none', border: 'none', cursor: 'pointer' }}>
+              cancel
+            </button>
+          )}
+        </div>
+        <div className="themes-panel__save-row">
+          <input
+            className="themes-panel__save-input"
+            placeholder={editingTheme ? editingTheme.name : 'Theme name…'}
+            value={themeName}
+            onChange={e => setThemeName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && saveCurrentAsTheme()}
+          />
+          <button className="themes-panel__save-btn" onClick={saveCurrentAsTheme} disabled={!selectedSlide}>
+            {editingTheme ? 'Update' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function OutputButton({ role, label, assignments }) {
   const [live, setLive] = useState(() => isOutputOpen(role));
   const [enabled, setEnabled] = useState(() => {
@@ -148,140 +313,6 @@ function OutputButton({ role, label, assignments }) {
     </button>
   );
 }
-
-// ── Themes panel ───────────────────────────────────────────────
-function ThemesPanel({ state, dispatch, onClose, updateSlideStyle, selectedSlide }) {
-  const [customThemes, setCustomThemes] = useState(loadCustomThemes);
-  const [themeName, setThemeName]       = useState('');
-  const [editingTheme, setEditingTheme] = useState(null); // theme being edited
-
-  const applyTheme = useCallback((theme) => {
-    if (!selectedSlide) return;
-    const keys = ['fontFamily','fontSize','fontWeight','textColor','transform','italic','underline','strikethrough','lineSpacing'];
-    const updates = {};
-    keys.forEach(k => { if (theme[k] !== undefined) updates[k] = theme[k]; });
-    dispatch({ type: 'APPLY_THEME_TO_ALL', payload: updates });
-    onClose();
-  }, [selectedSlide, dispatch, onClose]);
-
-  const saveCurrentAsTheme = useCallback(() => {
-    if (!selectedSlide) return;
-    const name = themeName.trim() || 'My Theme';
-    if (editingTheme) {
-      // Update existing custom theme
-      const next = customThemes.map(t => t.id === editingTheme.id
-        ? { ...t, name,
-            fontFamily: selectedSlide.fontFamily || 'Arial, sans-serif',
-            fontSize:   selectedSlide.fontSize   || 6,
-            fontWeight: selectedSlide.fontWeight || 800,
-            textColor:  selectedSlide.textColor  || '#ffffff',
-            transform:  selectedSlide.transform  || 'none',
-            italic:     selectedSlide.italic     || false,
-            underline:  selectedSlide.underline  || false,
-            strikethrough: selectedSlide.strikethrough || false,
-            lineSpacing: selectedSlide.lineSpacing || 1.2,
-          }
-        : t
-      );
-      setCustomThemes(next);
-      saveCustomThemes(next);
-      setEditingTheme(null);
-    } else {
-      const newTheme = {
-        id: `custom-${Date.now()}`, name,
-        fontFamily:    selectedSlide.fontFamily    || 'Arial, sans-serif',
-        fontSize:      selectedSlide.fontSize      || 6,
-        fontWeight:    selectedSlide.fontWeight    || 800,
-        textColor:     selectedSlide.textColor     || '#ffffff',
-        transform:     selectedSlide.transform     || 'none',
-        italic:        selectedSlide.italic        || false,
-        underline:     selectedSlide.underline     || false,
-        strikethrough: selectedSlide.strikethrough || false,
-        lineSpacing:   selectedSlide.lineSpacing   || 1.2,
-      };
-      const next = [...customThemes, newTheme];
-      setCustomThemes(next);
-      saveCustomThemes(next);
-    }
-    setThemeName('');
-  }, [selectedSlide, customThemes, themeName, editingTheme]);
-
-  const deleteTheme = useCallback((id) => {
-    const next = customThemes.filter(t => t.id !== id);
-    setCustomThemes(next);
-    saveCustomThemes(next);
-    if (editingTheme?.id === id) setEditingTheme(null);
-  }, [customThemes, editingTheme]);
-
-  const startEdit = (theme) => {
-    setEditingTheme(theme);
-    setThemeName(theme.name);
-  };
-
-  return (
-    <div className="themes-panel">
-      <div className="themes-panel__header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ThemesIcon />
-          <span className="themes-panel__title">THEMES</span>
-        </div>
-        <button className="themes-panel__close" onClick={onClose}>✕</button>
-      </div>
-
-      {!selectedSlide && (
-        <div className="themes-panel__hint">Select a slide to apply a theme</div>
-      )}
-
-      <div className="themes-panel__section-label">BUILT-IN</div>
-      <div className="themes-panel__grid">
-        {BUILTIN_THEMES.map(t => (
-          <ThemeCard key={t.id} theme={t} onApply={applyTheme} isCustom={false} onDelete={() => {}} />
-        ))}
-      </div>
-
-      {customThemes.length > 0 && (
-        <>
-          <div className="themes-panel__section-label">CUSTOM</div>
-          <div className="themes-panel__grid">
-            {customThemes.map(t => (
-              <ThemeCard key={t.id} theme={t} onApply={applyTheme} isCustom
-                onDelete={deleteTheme}
-                onEdit={() => startEdit(t)}
-                isEditing={editingTheme?.id === t.id}
-              />
-            ))}
-          </div>
-        </>
-      )}
-
-      <div className="themes-panel__save">
-        <div className="themes-panel__section-label">
-          {editingTheme ? `EDITING "${editingTheme.name.toUpperCase()}"` : 'SAVE CURRENT STYLE AS THEME'}
-          {editingTheme && (
-            <button onClick={() => { setEditingTheme(null); setThemeName(''); }}
-              style={{ marginLeft: 8, fontSize: 10, color: '#555', background: 'none', border: 'none', cursor: 'pointer' }}>
-              cancel
-            </button>
-          )}
-        </div>
-        <div className="themes-panel__save-row">
-          <input
-            className="themes-panel__save-input"
-            placeholder={editingTheme ? editingTheme.name : 'Theme name…'}
-            value={themeName}
-            onChange={e => setThemeName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && saveCurrentAsTheme()}
-          />
-          <button className="themes-panel__save-btn" onClick={saveCurrentAsTheme} disabled={!selectedSlide}>
-            {editingTheme ? 'Update' : 'Save'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
 
 // ── Account Button ─────────────────────────────────────────────
 function AccountButton() {
@@ -352,7 +383,7 @@ function AccountButton() {
   );
 }
 
-export default function Toolbar({ state, dispatch, selectedSlide, updateSlideStyle, onExportEf, onImportEf, onTextImport, onToggleAI, showAI, activeSong, showMediaBin, onToggleMediaBin }) {
+export default function Toolbar({ state, dispatch, selectedSlide, updateSlideStyle, onImportEf, onTextImport, onToggleAI, showAI, activeSong, showMediaBin, onToggleMediaBin }) {
   const { mode, isSynced } = state;
   const [assignments, setAssignments] = useState(loadAssignments);
   const [showThemes, setShowThemes]   = useState(false);
@@ -386,29 +417,39 @@ export default function Toolbar({ state, dispatch, selectedSlide, updateSlideSty
 
         {/* Themes button */}
         <button
-          className={`toolbar__themes-btn ${showThemes ? 'toolbar__themes-btn--active' : ''}`}
           onClick={() => setShowThemes(p => !p)}
           title="Themes"
+          style={{
+            height: 30, padding: '0 12px', borderRadius: 7, cursor: 'pointer',
+            background: showThemes ? 'rgba(212,175,55,0.15)' : 'rgba(212,175,55,0.06)',
+            border: `1px solid ${showThemes ? 'rgba(212,175,55,0.5)' : 'rgba(212,175,55,0.2)'}`,
+            color: '#D4AF37', fontSize: 11, fontWeight: 700,
+            display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.12s',
+          }}
         >
           <ThemesIcon />
           <span>Themes</span>
         </button>
 
-        {/* .ef file buttons */}
-        <div className="toolbar__ef-group">
-          <button className="toolbar__ef-btn" onClick={onImportEf} title="Import .ef song file">
-            <EfImportIcon /> Import .ef
-          </button>
-          <button className="toolbar__ef-btn" onClick={onTextImport} title="Import from text / clipboard">
-            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            Text Import
-          </button>
-          {activeSong && (
-            <button className="toolbar__ef-btn" onClick={onExportEf} title={`Export "${activeSong.title}" as .ef`}>
-              <EfExportIcon /> Export .ef
-            </button>
-          )}
-        </div>
+        {/* Text Import button */}
+        <button onClick={onTextImport} title="Import from text / clipboard"
+          style={{
+            height: 30, padding: '0 12px', borderRadius: 7, cursor: 'pointer',
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+            color: '#71717a', fontSize: 11, fontWeight: 700,
+            display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.12s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#a1a1aa'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = '#71717a'; }}
+        >
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14,2 14,8 20,8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+          Text Import
+        </button>
       </div>
 
       {/* ── CENTER: Mode switcher ── */}

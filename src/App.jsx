@@ -31,6 +31,7 @@ import StageMode from './StageMode';
 import FlowEditor from './FlowEditor';
 import WindowedOutputPicker from './WindowedOutputPicker';
 import TrailerVideo from './TrailerVideo';
+import Tutorial from './Tutorial';
 import GraphicsMode from './components/GraphicsMode/GraphicsMode';
 import ThemeEditor from './components/ThemeEditor/ThemeEditor';
 import ImportEfModal from './components/ImportEfModal/ImportEfModal';
@@ -227,6 +228,7 @@ export default function App() {
   const [showAI,           setShowAI]           = useState(false);
   const [showWindowedPicker, setShowWindowedPicker] = useState(false);
   const [showTrailer,        setShowTrailer]        = useState(false);
+  const [showTutorial,       setShowTutorial]       = useState(false); // shown after trailer
   const [update, dismissUpdate] = useUpdateCheck();
 
   const handleTextImport = useCallback(({ title, slides, destType, destId }) => {
@@ -355,6 +357,23 @@ export default function App() {
     applyTransform, sendToAudience,
   } = slideOps;
 
+  const handleSetHotkey = useCallback((key, slideId) => {
+    dispatch({ type: 'SET_HOTKEY', payload: { key: key.toLowerCase(), slideId } });
+  }, [dispatch]);
+
+  const handleSetGroup = useCallback((slideId, groupName, color) => {
+    setSlideGroup(slideId, groupName, color);
+    const GROUP_DEFAULTS = {
+      'Verse': 'v', 'Chorus': 'c', 'Bridge': 'b', 'Intro': 'i',
+      'Outro': 'o', 'Pre-Chorus': 'p', 'Ending': 'e', 'Tag': 't',
+      'Slide': 's', 'Interlude': 's',
+    };
+    const defaultKey = GROUP_DEFAULTS[groupName];
+    if (defaultKey && !state.hotkeys?.[defaultKey]) {
+      dispatch({ type: 'SET_HOTKEY', payload: { key: defaultKey, slideId } });
+    }
+  }, [setSlideGroup, dispatch, state.hotkeys]);
+
   // ── Sidebar items (defined early — used in keyboard handler) ──
   const displayedItems = state.activeSidebarType === 'lib'
     ? state.librarySongs.filter(s => s.libId === state.activeSidebarId)
@@ -404,6 +423,29 @@ export default function App() {
     state, dispatch, getCurrentWindow().label
   );
   useEffect(() => { loadPersistedData(); }, []);
+  // Auto-backup library to ~/Documents/ElevateFlow/library-backup.json
+  useEffect(() => {
+    const backup = async () => {
+      try {
+        const { homeDir } = await import('@tauri-apps/api/path');
+        const { mkdir, writeTextFile } = await import('@tauri-apps/plugin-fs');
+        const home = await homeDir();
+        const dir  = `${home}Documents/ElevateFlow`;
+        await mkdir(dir, { recursive: true }).catch(() => {});
+        const data = JSON.stringify({
+          version: 1,
+          savedAt: new Date().toISOString(),
+          libraries:  state.libraries,
+          librarySongs: state.librarySongs,
+          playlists:  state.playlists,
+        }, null, 2);
+        await writeTextFile(`${dir}/library-backup.json`, data);
+      } catch {}
+    };
+    const t = setTimeout(backup, 2000); // debounce
+    return () => clearTimeout(t);
+  }, [state.libraries, state.librarySongs, state.playlists]);
+
   useEffect(() => { saveData(); }, [
     state.librarySongs, state.playlists, state.libraries,
     state.mediaFiles, state.audioFiles, state.audioPlaylists,
@@ -418,10 +460,42 @@ export default function App() {
   // ── Keyboard navigation ───────────────────────────────────────
   useEffect(() => {
     const onKeyDown = async (e) => {
-      if (state.mode !== 'show' || !state.isHost) return;
       if (state.isTyping) return;
 
-      // ── Up/Down: change song ───────────────────────────────────
+      // ── Global shortcuts (work in ANY mode) ──────────────────
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === ',') {
+          e.preventDefault();
+          import('@tauri-apps/api/webviewWindow').then(({ WebviewWindow }) => {
+            WebviewWindow.getByLabel('settings').then(w => {
+              if (w) { w.show(); w.setFocus(); }
+              else new WebviewWindow('settings', { url: 'index.html#/settings', width: 600, height: 500, title: 'Settings', resizable: false, center: true });
+            }).catch(() => {
+              new WebviewWindow('settings', { url: 'index.html#/settings', width: 600, height: 500, title: 'Settings', resizable: false, center: true });
+            });
+          });
+          return;
+        }
+        if (e.key === 't' || e.key === 'T') {
+          e.preventDefault();
+          import('@tauri-apps/api/webviewWindow').then(({ WebviewWindow }) => {
+            WebviewWindow.getByLabel('timecode').then(w => {
+              if (w) { w.show(); w.setFocus(); }
+              else new WebviewWindow('timecode', { url: 'index.html#/timecode', width: 500, height: 600, title: 'Timecode', resizable: false, center: true });
+            }).catch(() => {
+              new WebviewWindow('timecode', { url: 'index.html#/timecode', width: 500, height: 600, title: 'Timecode', resizable: false, center: true });
+            });
+          });
+          return;
+        }
+        if (e.key === '1') { e.preventDefault(); dispatch({ type: 'SET_MODE', payload: 'show' });  return; }
+        if (e.key === '2') { e.preventDefault(); dispatch({ type: 'SET_MODE', payload: 'edit' });  return; }
+        if (e.key === '3') { e.preventDefault(); dispatch({ type: 'SET_MODE', payload: 'stage' }); return; }
+        if (e.key === '4') { e.preventDefault(); dispatch({ type: 'SET_MODE', payload: 'flow' });  return; }
+      }
+
+      // ── Show mode only ────────────────────────────────────────
+      if (state.mode !== 'show' || !state.isHost) return;
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         const idx = displayedItems.findIndex(s => s.id === state.activeItemId);
         if (e.key === 'ArrowDown' && idx < displayedItems.length - 1) {
@@ -449,6 +523,30 @@ export default function App() {
         emitSync('CHANGE_SLIDE', { slideId: prev.id });
         await pushToOutputs('audience-update', buildAudiencePayload(prev, state.liveVideo, state.activeOverlay, slides[slides.findIndex(s => s.id === prev.id) + 1], state.volume, state.fadeDuration));
       }
+      // ── Hotkey slide trigger ───────────────────────────────────
+      const key = e.key.toLowerCase();
+      if (/^[a-z]$/.test(key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const slideId = state.hotkeys?.[key];
+        if (slideId) {
+          // Find the slide across all songs
+          let hotkeySlide = null;
+          for (const song of state.librarySongs) {
+            const found = song.slides?.find(s => s.id === slideId);
+            if (found) { hotkeySlide = found; break; }
+          }
+          if (hotkeySlide) {
+            dispatch({ type: 'SET_SELECTED_SLIDE', payload: slideId });
+            const vidPath = hotkeySlide.video || state.liveVideo || null;
+            const ovrPath = hotkeySlide.overlay || state.activeOverlay || null;
+            const idx2 = displaySlides.findIndex(s => s.id === slideId);
+            const nxt  = idx2 >= 0 ? displaySlides[idx2 + 1] : null;
+            await pushToOutputs('audience-update', buildAudiencePayload(hotkeySlide, vidPath, ovrPath, nxt, state.volume, state.fadeDuration));
+            e.preventDefault();
+            return;
+          }
+        }
+      }
+
       if (e.key === 'Escape') {
         dispatch({ type: 'SET_SELECTED_SLIDE', payload: null });
         dispatch({ type: 'SET_LIVE_VIDEO',     payload: null });
@@ -538,11 +636,27 @@ export default function App() {
           const { getCurrentWindow } = await import('@tauri-apps/api/window');
           await getCurrentWindow().setFullscreen(true);
         } catch {}
+        // Try to play trailer, fall back to tutorial directly if file missing
         setShowTrailer(true);
       }).then(f => { unlisten = f; });
     });
     return () => { unlisten?.(); };
   }, []);
+
+  // Listen for Import .ef from menu bar
+  useEffect(() => {
+    let unlisten;
+    import('@tauri-apps/api/event').then(({ listen: listenFn }) => {
+      listenFn('menu-import-ef', async () => {
+        try {
+          const { importEfFile } = await import('./hooks/useEfFiles');
+          const song = await importEfFile();
+          if (song) dispatch({ type: 'SET_IMPORT_EF_PENDING', payload: song });
+        } catch (e) { console.error(e); }
+      }).then(f => { unlisten = f; });
+    });
+    return () => { unlisten?.(); };
+  }, [dispatch]);
 
   // Listen for Windowed Output menu item
   useEffect(() => {
@@ -808,13 +922,14 @@ export default function App() {
       {showTrailer && (
         <TrailerVideo onDone={async () => {
           setShowTrailer(false);
-          // Exit fullscreen after trailer
           try {
             const { getCurrentWindow } = await import('@tauri-apps/api/window');
             await getCurrentWindow().setFullscreen(false);
           } catch {}
+          setShowTutorial(true);
         }} />
       )}
+      {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
 
       {showAI && (
         <AIAssistant
@@ -862,7 +977,6 @@ export default function App() {
         state={state} dispatch={dispatch}
         selectedSlide={selectedSlide}
         updateSlideStyle={updateSlideStyle}
-        onExportEf={handleExportEf}
         onImportEf={handleImportEf}
         activeSong={activeSong}
         showMediaBin={showMediaBin}

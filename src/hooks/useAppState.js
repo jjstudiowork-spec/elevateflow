@@ -42,6 +42,7 @@ const initialState = {
   audioFiles: [],
   activeAudioUrl: null,
   liveVideo: null,
+  liveMediaType: 'video', // 'video' | 'image'
   activeOverlay: null,
 
   // Transport
@@ -97,6 +98,8 @@ const initialState = {
   timelineDuration: null,   // null = auto-calculate
   slideCueTimes:    {},     // { [slideId]: seconds }
   slideCardSize: 180, // slide card width in px
+  // Hotkeys: { [key: string]: slideId }  e.g. { 'v': 'slide-123' }
+  hotkeys: {},
 
   // Edit Mode
   dragOffset: { x: 0, y: 0 },
@@ -197,6 +200,7 @@ function reducer(state, action) {
     case 'ADD_AUDIO_FILES': return { ...state, audioFiles: [...state.audioFiles, ...action.payload] };
     case 'ADD_AUDIO_FILE':  return { ...state, audioFiles: [...state.audioFiles, action.payload] };
     case 'SET_LIVE_VIDEO': return { ...state, liveVideo: action.payload };
+    case 'SET_MEDIA_TYPE': return { ...state, liveMediaType: action.payload };
     case 'SET_ACTIVE_AUDIO_URL': return { ...state, activeAudioUrl: action.payload };
     case 'SET_ACTIVE_OVERLAY': return { ...state, activeOverlay: action.payload };
     case 'TOGGLE_OVERLAY': return {
@@ -363,6 +367,24 @@ function reducer(state, action) {
         ),
       };
     }
+    case 'SET_HOTKEY': {
+      const { key, slideId } = action.payload;
+      const next = { ...state.hotkeys };
+      if (slideId === null) {
+        // Remove any existing binding for this slide
+        Object.keys(next).forEach(k => { if (next[k] === slideId) delete next[k]; });
+      } else {
+        // Remove old binding for this key if any
+        Object.keys(next).forEach(k => { if (next[k] === slideId) delete next[k]; });
+        next[key.toLowerCase()] = slideId;
+      }
+      return { ...state, hotkeys: next };
+    }
+    case 'REMOVE_HOTKEY': {
+      const next = { ...state.hotkeys };
+      delete next[action.payload];
+      return { ...state, hotkeys: next };
+    }
     case 'ADD_STAGE_ELEMENT': {
       const { layoutId, element } = action.payload;
       return {
@@ -407,7 +429,12 @@ function reducer(state, action) {
       ...state,
       librarySongs: state.librarySongs.map(song =>
         song.id === state.activeItemId
-          ? { ...song, slides: (song.slides || []).map(s => ({ ...s, ...action.payload })) }
+          ? { ...song, slides: (song.slides || []).map(s => {
+              const updates = { ...action.payload };
+              // Only apply position/size if the theme explicitly includes them
+              const result = { ...s, ...updates };
+              return result;
+            })}
           : song
       ),
     };

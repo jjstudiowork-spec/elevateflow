@@ -162,8 +162,13 @@ function AudiencePreview({ state, dispatch, selectedSlide, nextSlide, videoRef, 
         <div className="preview-screen" style={{ aspectRatio }}>
         {isAudiencePreview ? (
           <>
-            {/* Background video */}
-            {videoSrc && (
+            {/* Background video or image */}
+            {videoSrc && liveVideo?.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/i) ? (
+              <img key={videoSrc} src={videoSrc}
+                className="preview-screen__bg-video"
+                style={{ objectFit: 'cover', width: '100%', height: '100%', position: 'absolute', inset: 0 }}
+              />
+            ) : videoSrc ? (
               <video
                 ref={videoRef}
                 key={videoSrc}
@@ -176,7 +181,7 @@ function AudiencePreview({ state, dispatch, selectedSlide, nextSlide, videoRef, 
                 onPause={() => dispatch({ type: 'SET_IS_PLAYING', payload: false })}
                 style={{ animation: `ef-preview-fade ${state.fadeDuration ?? 0.5}s ease` }}
               />
-            )}
+            ) : null}
 
             {/* Text layer */}
             {selectedSlide && (

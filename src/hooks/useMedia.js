@@ -1,47 +1,38 @@
 /**
  * useMedia.js
- * Handles all media operations:
- *  - Import via native file dialog (Tauri dialog plugin)
- *  - Click routing (video → liveVideo, audio → audioUrl, overlay → activeOverlay)
- *  - Drag from desktop onto the app
- *  - convertFileSrc so videos work in both main + output windows
- *
- * useTransport handles playback state for the video/audio elements.
+ * - Import goes into whichever tab is currently active (mediaBinTab)
+ * - Stores both src (asset URL for main window) and path (raw FS path for output windows)
+ * - handleMediaClick routes video/audio/overlay correctly
  */
 
 import { useCallback } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
 
-// ─────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Detect media type from file extension */
 function detectMediaType(path) {
   const ext = path.split('.').pop().toLowerCase();
   if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v'].includes(ext)) return 'video';
-  if (['mp3', 'wav', 'aac', 'flac', 'm4a', 'ogg'].includes(ext)) return 'audio';
+  if (['mp3', 'wav', 'aac', 'flac', 'm4a', 'ogg'].includes(ext))  return 'audio';
   if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) return 'image';
-  return 'video'; // default
+  return 'video';
 }
 
-/** Detect if a video is likely meant as an overlay (has alpha / is named overlay) */
-function isLikelyOverlay(path) {
-  const lower = path.toLowerCase();
-  return lower.includes('overlay') || lower.includes('alpha') || lower.endsWith('.webm');
-}
+// Map mediaBinTab → category stored on the media file
+const TAB_TO_CATEGORY = {
+  backgrounds: 'background',
+  overlays:    'overlay',
+  video:       'video',
+  image:       'image',
+  audio:       'audio',
+  all:         null,
+};
 
-// ─────────────────────────────────────────────────────────────────
-// useMedia
-// ─────────────────────────────────────────────────────────────────
+// ── useMedia ──────────────────────────────────────────────────────────────────
 
 export function useMedia(state, dispatch, audioRef, videoRef) {
 
-  /**
-   * Open native file picker and import selected files into the media bin.
-   * Uses convertFileSrc so the paths work as <video src> in Tauri webviews.
-   */
   const handleImportMedia = useCallback(async () => {
     try {
       const selected = await open({
@@ -49,31 +40,36 @@ export function useMedia(state, dispatch, audioRef, videoRef) {
         filters: [{
           name: 'Media',
           extensions: [
-            'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v',  // video
-            'mp3', 'wav', 'aac', 'flac', 'm4a', 'ogg',  // audio
-            'png', 'jpg', 'jpeg', 'gif', 'webp',         // image
+            'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v',
+            'mp3', 'wav', 'aac', 'flac', 'm4a', 'ogg',
+            'png', 'jpg', 'jpeg', 'gif', 'webp',
           ],
         }],
       });
 
-      if (!selected) return; // user cancelled
-
+      if (!selected) return;
       const paths = Array.isArray(selected) ? selected : [selected];
 
+      const activeTab = state.mediaBinTab || 'all';
+
       paths.forEach(rawPath => {
-        const type    = detectMediaType(rawPath);
-        const srcUrl  = convertFileSrc(rawPath); // works in all Tauri windows
+        const detectedType = detectMediaType(rawPath);
+        const srcUrl       = convertFileSrc(rawPath);
+
+        // Category = active tab so it appears on that tab (and always on 'all')
+        const category = TAB_TO_CATEGORY[activeTab] ?? detectedType;
 
         const mediaFile = {
-          id:      Date.now() + Math.random(),
-          name:    rawPath.split(/[\\/]/).pop(),
-          path:    rawPath,   // raw filesystem path (for emitTo payload)
-          src:     srcUrl,    // asset:// URL (for <video> / <img> src)
-          type,
-          deckId:  state.activeDeckId || null,
+          id:       Date.now() + Math.random(),
+          name:     rawPath.split(/[\\/]/).pop(),
+          path:     rawPath,   // raw filesystem path — send this via emitTo
+          src:      srcUrl,    // asset:// URL — use this for <video src> in main window
+          type:     detectedType,
+          category,
+          deckId:   state.activeDeckId || null,
         };
 
-        if (type === 'audio') {
+        if (detectedType === 'audio') {
           dispatch({ type: 'ADD_AUDIO_FILE', payload: mediaFile });
         } else {
           dispatch({ type: 'ADD_MEDIA_FILE', payload: mediaFile });
@@ -83,14 +79,19 @@ export function useMedia(state, dispatch, audioRef, videoRef) {
     } catch (err) {
       console.error('[useMedia] Import failed:', err);
     }
-  }, [dispatch, state.activeDeckId]);
+  }, [dispatch, state.mediaBinTab, state.activeDeckId]);
 
-  /**
-   * Handle clicking a media card in the bin.
-   * Routes based on type and whether it looks like an overlay.
-   */
+
   const handleMediaClick = useCallback((mediaFile) => {
-    const { type, src, path } = mediaFile;
+    const { type, category, src, path } = mediaFile;
+
+    // Images — set as background (same path as video but rendered as <img> in AudienceView)
+    if (type === 'image' || path?.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/i)) {
+      dispatch({ type: 'SET_LIVE_VIDEO', payload: path });
+      dispatch({ type: 'SET_MEDIA_TYPE', payload: 'image' });
+      dispatch({ type: 'SET_TRANSPORT_TAB', payload: 'video' });
+      return;
+    }
 
     if (type === 'audio') {
       dispatch({ type: 'SET_ACTIVE_AUDIO_URL', payload: src });
@@ -102,20 +103,14 @@ export function useMedia(state, dispatch, audioRef, videoRef) {
       return;
     }
 
-    if (type === 'image') {
-      // Images go to the live background slot
-      dispatch({ type: 'SET_LIVE_VIDEO', payload: src });
-      return;
-    }
+    const isOverlay = category === 'overlay' || path?.toLowerCase().endsWith('.webm');
 
-    // Video — decide background vs overlay
-    if (isLikelyOverlay(path)) {
-      dispatch({ type: 'SET_ACTIVE_OVERLAY',  payload: src });
-      dispatch({ type: 'SET_TRANSPORT_TAB',   payload: 'video' });
+    if (isOverlay) {
+      dispatch({ type: 'SET_ACTIVE_OVERLAY', payload: path });
     } else {
-      dispatch({ type: 'SET_LIVE_VIDEO',      payload: src });
-      dispatch({ type: 'SET_TRANSPORT_TAB',   payload: 'video' });
-      if (videoRef?.current) {
+      dispatch({ type: 'SET_LIVE_VIDEO',     payload: path });
+      dispatch({ type: 'SET_TRANSPORT_TAB',  payload: 'video' });
+      if (videoRef?.current && type === 'video') {
         videoRef.current.src = src;
         videoRef.current.play().catch(() => {});
       }
@@ -125,17 +120,13 @@ export function useMedia(state, dispatch, audioRef, videoRef) {
   return { handleImportMedia, handleMediaClick };
 }
 
-// ─────────────────────────────────────────────────────────────────
-// useTransport
-// ─────────────────────────────────────────────────────────────────
+// ── useTransport ──────────────────────────────────────────────────────────────
 
 export function useTransport(state, dispatch, videoRef, audioRef) {
 
   const togglePlay = useCallback(() => {
-    const isVideoMode = state.transportTab === 'video';
-    const ref = isVideoMode ? videoRef : audioRef;
+    const ref = state.transportTab === 'video' ? videoRef : audioRef;
     if (!ref?.current) return;
-
     if (ref.current.paused) {
       ref.current.play().catch(() => {});
     } else {
@@ -144,8 +135,7 @@ export function useTransport(state, dispatch, videoRef, audioRef) {
   }, [state.transportTab, videoRef, audioRef]);
 
   const skipTime = useCallback((seconds) => {
-    const isVideoMode = state.transportTab === 'video';
-    const ref = isVideoMode ? videoRef : audioRef;
+    const ref = state.transportTab === 'video' ? videoRef : audioRef;
     if (!ref?.current) return;
     ref.current.currentTime = Math.max(0, ref.current.currentTime + seconds);
   }, [state.transportTab, videoRef, audioRef]);
