@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from 'react';
 
 const UPDATE_URL  = 'https://api.github.com/repos/jjstudiowork-spec/elevateflow/releases/latest';
-const CURRENT_VER  = '0.2.0';
+const CURRENT_VER  = '0.2.2';
 
 function isNewer(remote, current) {
   const parse = v => v.replace(/[^0-9.]/g, '').split('.').map(Number);
