@@ -1,68 +1,87 @@
 /* ── Toolbar output buttons ──────────────────────────────────────── */
 
-/* ── Mode switcher ── */
+/* ── Mode switcher — Liquid Glass ── */
 .toolbar__mode-group {
   display: flex;
   align-items: center;
-  background: rgba(0,0,0,0.35);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 8px;
-  padding: 3px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 14px;
+  padding: 5px;
   gap: 2px;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    inset 0 -1px 0 rgba(0,0,0,0.1),
+    0 4px 16px rgba(0,0,0,0.2);
+  -webkit-app-region: no-drag;
 }
 
 .toolbar__mode-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 13px;
-  height: 26px;
-  border-radius: 6px;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 16px;
+  height: 46px;
+  border-radius: 12px;
   border: none;
   background: transparent;
-  color: #555;
-  font-size: 10px;
+  color: rgba(255,255,255,0.35);
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
+  letter-spacing: 0.5px;
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition: all 0.15s ease;
   white-space: nowrap;
   position: relative;
+  -webkit-app-region: no-drag;
 }
 
 .toolbar__mode-btn svg {
-  opacity: 0.5;
+  opacity: 0.4;
   transition: opacity 0.15s ease;
   flex-shrink: 0;
 }
 
 .toolbar__mode-btn:hover {
-  color: #aaa;
-  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.7);
+  background: rgba(255,255,255,0.07);
 }
 
-.toolbar__mode-btn:hover svg {
-  opacity: 0.8;
-}
+.toolbar__mode-btn:hover svg { opacity: 0.7; }
 
 .toolbar__mode-btn--active {
-  background: linear-gradient(180deg, #2a2a2a 0%, #1f1f1f 100%);
-  color: #D4AF37;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
-  border: 1px solid rgba(212,175,55,0.2);
+  background:
+    linear-gradient(160deg,
+      rgba(255,255,255,0.18) 0%,
+      rgba(255,255,255,0.08) 50%,
+      rgba(255,255,255,0.04) 100%);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.25),
+    inset 0 -1px 0 rgba(0,0,0,0.1),
+    0 2px 8px rgba(0,0,0,0.25),
+    0 0 0 0.5px rgba(255,255,255,0.08);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
 }
 
 .toolbar__mode-btn--active svg {
   opacity: 1;
-  color: #D4AF37;
-  stroke: #D4AF37;
+  color: #fff;
+  stroke: #fff;
+  filter: drop-shadow(0 0 4px rgba(255,255,255,0.4));
 }
 
 .toolbar__mode-btn--active:hover {
-  color: #D4AF37;
-  background: linear-gradient(180deg, #2e2e2e 0%, #222 100%);
+  color: #fff;
+  background:
+    linear-gradient(160deg,
+      rgba(255,255,255,0.22) 0%,
+      rgba(255,255,255,0.12) 50%,
+      rgba(255,255,255,0.06) 100%);
 }
 
 .toolbar__right {
@@ -85,21 +104,30 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 0 14px;
-  height: 30px;
-  border-radius: 6px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: linear-gradient(180deg, #242424 0%, #1a1a1a 100%);
-  color: #666;
+  gap: 6px;
+  padding: 0 16px;
+  height: 46px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background:
+    linear-gradient(160deg,
+      rgba(255,255,255,0.12) 0%,
+      rgba(255,255,255,0.05) 50%,
+      rgba(255,255,255,0.02) 100%);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  color: rgba(255,255,255,0.5);
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 1px;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    inset 0 -1px 0 rgba(0,0,0,0.12),
+    0 4px 12px rgba(0,0,0,0.25);
   overflow: hidden;
 }
 
@@ -112,36 +140,54 @@
 }
 
 .toolbar-output-btn:hover {
-  border-color: rgba(212,175,55,0.4);
-  color: #D4AF37;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04), 0 0 12px rgba(212,175,55,0.08);
+  border-color: rgba(255,255,255,0.22);
+  color: rgba(255,255,255,0.85);
+  background:
+    linear-gradient(160deg,
+      rgba(255,255,255,0.18) 0%,
+      rgba(255,255,255,0.08) 50%,
+      rgba(255,255,255,0.04) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.22),
+    0 6px 20px rgba(0,0,0,0.3);
 }
 
-/* ── Live state — green ── */
+/* ── Live state — green glass ── */
 .toolbar-output-btn--live {
-  background: linear-gradient(180deg, rgba(0,200,100,0.15) 0%, rgba(0,160,80,0.1) 100%);
-  border-color: rgba(0,255,136,0.3);
+  background:
+    linear-gradient(160deg,
+      rgba(0,232,122,0.22) 0%,
+      rgba(0,200,100,0.1) 60%,
+      rgba(0,160,80,0.06) 100%);
+  border-color: rgba(0,255,136,0.35);
   color: #00e87a;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(0,255,136,0.08), 0 0 14px rgba(0,255,136,0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(0,255,136,0.2),
+    0 4px 12px rgba(0,0,0,0.25),
+    0 0 20px rgba(0,255,136,0.12);
 }
 
 .toolbar-output-btn--live:hover {
-  border-color: rgba(0,255,136,0.5);
+  border-color: rgba(0,255,136,0.55);
   color: #00ff88;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 0 18px rgba(0,255,136,0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(0,255,136,0.3),
+    0 6px 20px rgba(0,0,0,0.3),
+    0 0 28px rgba(0,255,136,0.2);
 }
 
 /* ── No screen assigned ── */
 .toolbar-output-btn--unassigned {
-  opacity: 0.38;
+  opacity: 0.35;
   border-style: dashed;
-  border-color: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.08);
+  background: transparent;
 }
 
 .toolbar-output-btn--unassigned:hover {
   opacity: 0.6;
-  border-color: rgba(255,255,255,0.2);
-  color: #888;
+  border-color: rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.5);
 }
 
 /* ── Pulsing dot when live ── */

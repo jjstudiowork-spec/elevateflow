@@ -29,7 +29,12 @@
         "title": "ElevateFlow",
         "width": 1600,
         "height": 960,
-        "visible": false
+        "visible": false,
+        "transparent": true,
+        "hiddenTitle": true,
+        "titleBarStyle": "Overlay",
+        "shadow": true,
+        "trafficLightPosition": { "x": 20, "y": 34 }
       },
       {
         "label": "close-confirm",
@@ -61,9 +66,7 @@
       "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost blob: data:; media-src 'self' asset: https://asset.localhost blob: data:; connect-src 'self' https://api.github.com https://github.com https://objects.githubusercontent.com https://elevateflow.netlify.app http://localhost:1025 https://generativelanguage.googleapis.com https://www.google.com",
       "assetProtocol": {
         "enable": true,
-        "scope": [
-          "**"
-        ]
+        "scope": ["**"]
       }
     },
     "macOSPrivateApi": true
@@ -78,14 +81,5 @@
       "icons/icon-32.png",
       "icons/icon-16.png"
     ]
-  },
-  "plugins": {
-    "updater": {
-      "active": true,
-      "endpoints": [
-        "https://updates.tauri.app/releases/{{target}}"
-      ],
-      "dialog": true
-    }
   }
 }

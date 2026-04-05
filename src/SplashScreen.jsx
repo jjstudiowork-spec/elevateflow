@@ -12,7 +12,7 @@ const STEPS = [
   'Loading libraries…',
   'Preparing media engine…',
   'Restoring your songs…',
-  'Ready',
+  'Welcome to ElevateFlow!',
 ];
 
 export default function SplashScreen() {

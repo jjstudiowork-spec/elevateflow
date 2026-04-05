@@ -6,7 +6,6 @@ use libloading::Library;
 use std::ffi::CString;
 use std::sync::{Arc, Mutex};
 use std::os::raw::{c_char, c_int, c_float};
-use std::thread;
 
 // ── NDI C types ────────────────────────────────────────────────
 
@@ -36,7 +35,6 @@ struct NDIVideoFrameV2 {
 }
 
 const FOURCC_BGRA: u32 = 0x41524742;
-const FOURCC_RGBA: u32 = 0x41424752;
 
 // ── NDI Sender ─────────────────────────────────────────────────
 
@@ -150,11 +148,11 @@ fn start_capture_thread(_state: Arc<Mutex<CaptureState>>, _window_label: String)
 /// Start NDI with scap window capture (Option A — best quality)
 #[tauri::command]
 pub fn ndi_capture_start(
-    app: tauri::AppHandle,
+    _app: tauri::AppHandle,
     role: String,
     name: String,
-    width: i32,
-    height: i32,
+    _width: i32,
+    _height: i32,
 ) -> Result<String, String> {
     let sender = make_sender(&name)?;
 

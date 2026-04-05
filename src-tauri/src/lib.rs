@@ -178,7 +178,7 @@ pub fn run() {
                             tauri::WebviewUrl::App("index.html#/close-confirm".into()),
                         )
                         .title("Close ElevateFlow")
-                        .inner_size(360.0, 220.0)
+                        .inner_size(220.0, 450.0)
                         .resizable(false)
                         .center()
                         .always_on_top(true)
