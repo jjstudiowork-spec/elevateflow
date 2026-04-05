@@ -1,17 +1,17 @@
 {
   "name": "tauri-appworship-presenter",
   "private": true,
-  "version": "0.2.2",
+  "version": "0.2.3",
   "type": "module",
   "scripts": {
-  "dev": "bash scripts/clean-tauri.sh && vite",
-  "build": "bash scripts/clean-tauri.sh && vite build",
-  "preview": "vite preview",
-  "tauri": "bash scripts/clean-tauri.sh && tauri",
-  "tauri:dev": "bash scripts/clean-tauri.sh && tauri dev",
-  "tauri:build": "bash scripts/clean-tauri.sh && tauri build",
-  "release": "node scripts/release.cjs"
-},
+    "dev": "bash scripts/clean-tauri.sh && vite",
+    "build": "bash scripts/clean-tauri.sh && vite build",
+    "preview": "vite preview",
+    "tauri": "bash scripts/clean-tauri.sh && tauri",
+    "tauri:dev": "bash scripts/clean-tauri.sh && tauri dev",
+    "tauri:build": "bash scripts/clean-tauri.sh && tauri build",
+    "release": "node scripts/release.cjs"
+  },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
