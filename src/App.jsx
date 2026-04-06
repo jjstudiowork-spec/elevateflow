@@ -26,7 +26,8 @@ import MediaBin from './components/MediaBin/MediaBin';
 import EditMode from './components/EditMode/EditMode';
 import TextImport from './TextImport';
 import AIAssistant from './AIAssistant';
-import UpdateNotifier, { useUpdateCheck } from './UpdateNotifier';
+import { useUpdateCheck } from './UpdateNotifier';
+import UpdateModal from './UpdateModal';
 import StageMode from './StageMode';
 import FlowEditor from './FlowEditor';
 import WindowedOutputPicker from './WindowedOutputPicker';
@@ -230,6 +231,10 @@ export default function App() {
   const [showTrailer,        setShowTrailer]        = useState(false);
   const [showTutorial,       setShowTutorial]       = useState(false); // shown after trailer
   const [update, dismissUpdate] = useUpdateCheck();
+const [skippedVersion, setSkippedVersion] = React.useState(
+  () => localStorage.getItem('ef_skipped_version') || null
+);
+const showUpdateModal = update && update.version !== skippedVersion;
 
   const handleTextImport = useCallback(({ title, slides, destType, destId }) => {
     const songId = 'txt_' + Date.now();
@@ -917,7 +922,23 @@ export default function App() {
       onMouseLeave={() => dispatch({ type: 'SET_INTERACTION_MODE', payload: null })}
     >
       {/* Audio element is fully uncontrolled — src set imperatively in playTrack */}
-      <UpdateNotifier update={update} onDismiss={dismissUpdate} />
+      {showUpdateModal && (
+  <UpdateModal
+    updateInfo={{
+      version: update.version,
+      notes: update.notes,
+      pubDate: update.date,
+      downloadUrl: update.url,
+      gatekeeperCommand: `xattr -rd com.apple.quarantine /Applications/ElevateFlow.app`,
+    }}
+    onRemindLater={dismissUpdate}
+    onSkip={() => {
+      localStorage.setItem('ef_skipped_version', update.version);
+      setSkippedVersion(update.version);
+      dismissUpdate();
+    }}
+  />
+)}
       {showWindowedPicker && <WindowedOutputPicker onClose={() => setShowWindowedPicker(false)} />}
       {showTrailer && (
         <TrailerVideo onDone={async () => {
