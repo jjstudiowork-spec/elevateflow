@@ -25,6 +25,7 @@ libloading = "0.8"
 lazy_static = "1"
 base64 = "0.22"
 tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 
 # Networking for Sync
 tokio = { version = "1", features = ["full"] }

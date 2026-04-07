@@ -1,85 +1,84 @@
 /**
  * useUpdater.js
- * Checks for a new ElevateFlow version by fetching latest.json
- * hosted on your Netlify site.
- *
- * Returns { updateInfo, dismiss, remindLater }
- *   updateInfo  — null (no update / dismissed) or { version, notes, pubDate, downloadUrl, gatekeeperCommand }
- *   dismiss     — permanently skip this version forever
- *   remindLater — snooze for 24 hours
+ * Uses Tauri's built-in updater plugin.
+ * Checks for updates on launch, handles download + install in-app.
  */
-
-import { useEffect, useState } from 'react';
-
-// ─── CHANGE THIS to your Netlify site URL after you deploy ───────
-const UPDATE_MANIFEST_URL = 'https://elevateflow.netlify.app/latest.json';
-
-// Must match the "version" field in tauri.conf.json
-const CURRENT_VERSION = '0.1.0';
-
-// localStorage keys
-const KEY_SKIP   = 'ef_update_skip_version';
-const KEY_SNOOZE = 'ef_update_snooze_until';
-
-// Returns true if `remote` is strictly newer than `current`
-function isNewer(remote, current) {
-  const parse = (v) => String(v).replace(/^v/, '').split('.').map(Number);
-  const [rMaj, rMin, rPat] = parse(remote);
-  const [cMaj, cMin, cPat] = parse(current);
-  if (rMaj !== cMaj) return rMaj > cMaj;
-  if (rMin !== cMin) return rMin > cMin;
-  return rPat > cPat;
-}
+import { useState, useEffect, useCallback } from 'react';
 
 export function useUpdater() {
-  const [updateInfo, setUpdateInfo] = useState(null);
+  const [updateInfo,   setUpdateInfo]   = useState(null); // null = no update
+  const [status,       setStatus]       = useState('idle'); // idle | checking | downloading | installing | done | error
+  const [progress,     setProgress]     = useState(0);
+  const [error,        setError]        = useState(null);
+  const [updaterObj,   setUpdaterObj]   = useState(null); // the Tauri update object
 
   useEffect(() => {
     const check = async () => {
-      // Respect active snooze
-      const snoozeUntil = localStorage.getItem(KEY_SNOOZE);
-      if (snoozeUntil && new Date() < new Date(snoozeUntil)) return;
-
-      let manifest;
       try {
-        const res = await fetch(UPDATE_MANIFEST_URL, { cache: 'no-store' });
-        if (!res.ok) return;
-        manifest = await res.json();
-      } catch {
-        return; // No internet or wrong URL — fail silently
+        setStatus('checking');
+        const { check: checkUpdate } = await import('@tauri-apps/plugin-updater');
+        const update = await checkUpdate();
+        if (update?.available) {
+          setUpdaterObj(update);
+          setUpdateInfo({
+            version:  update.version,
+            notes:    update.body    || '',
+            pubDate:  update.date    || '',
+            downloadUrl: null, // handled by Tauri, not browser
+            gatekeeperCommand: 'xattr -rd com.apple.quarantine /Applications/ElevateFlow.app',
+          });
+        }
+        setStatus('idle');
+      } catch (e) {
+        // Silently fail — network issues, no update available, etc.
+        setStatus('idle');
       }
-
-      const { version, notes, pub_date, download_url } = manifest;
-      if (!version || !isNewer(version, CURRENT_VERSION)) return;
-
-      // Respect "skip this version"
-      if (localStorage.getItem(KEY_SKIP) === version) return;
-
-      setUpdateInfo({
-        version,
-        notes:            notes        || '',
-        pubDate:          pub_date     || '',
-        downloadUrl:      download_url || '',
-        gatekeeperCommand: 'xattr -cr /Applications/ElevateFlow.app',
-      });
     };
 
-    // 4-second delay so the splash screen can finish first
-    const timer = setTimeout(check, 4000);
-    return () => clearTimeout(timer);
+    // Check 4 seconds after launch
+    const t = setTimeout(check, 4000);
+    return () => clearTimeout(t);
   }, []);
 
-  const dismiss = () => {
-    if (updateInfo) localStorage.setItem(KEY_SKIP, updateInfo.version);
-    setUpdateInfo(null);
-  };
+  const installUpdate = useCallback(async () => {
+    if (!updaterObj) return;
+    try {
+      setStatus('downloading');
+      setProgress(0);
 
-  const remindLater = () => {
-    const until = new Date();
-    until.setHours(until.getHours() + 24);
-    localStorage.setItem(KEY_SNOOZE, until.toISOString());
-    setUpdateInfo(null);
-  };
+      await updaterObj.downloadAndInstall((event) => {
+        if (event.event === 'Started') {
+          setProgress(0);
+        } else if (event.event === 'Progress') {
+          const { chunkLength, contentLength } = event.data;
+          if (contentLength) {
+            setProgress(p => Math.min(100, p + (chunkLength / contentLength) * 100));
+          }
+        } else if (event.event === 'Finished') {
+          setProgress(100);
+          setStatus('installing');
+        }
+      });
 
-  return { updateInfo, dismiss, remindLater };
+      setStatus('done');
+      // Relaunch after a short delay
+      setTimeout(async () => {
+        try {
+          const { relaunch } = await import('@tauri-apps/plugin-process');
+          await relaunch();
+        } catch {}
+      }, 1500);
+
+    } catch (e) {
+      setStatus('error');
+      setError(e?.message || 'Update failed');
+    }
+  }, [updaterObj]);
+
+  const dismiss = useCallback(() => {
+    setUpdateInfo(null);
+    setStatus('idle');
+  }, []);
+
+  return { updateInfo, status, progress, error, installUpdate, dismiss };
 }

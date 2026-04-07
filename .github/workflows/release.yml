@@ -32,12 +32,14 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: ElevateFlow ${{ github.ref_name }}
           releaseBody: ${{ github.event.head_commit.message }}
           releaseDraft: false
           prerelease: false
+          includeUpdaterJson: true
           args: --target universal-apple-darwin
 
       - name: Rename DMG to simple name

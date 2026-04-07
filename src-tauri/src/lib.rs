@@ -146,6 +146,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             open_media_inspector,
             confirm_close,
@@ -178,7 +180,7 @@ pub fn run() {
                             tauri::WebviewUrl::App("index.html#/close-confirm".into()),
                         )
                         .title("Close ElevateFlow")
-                        .inner_size(220.0, 450.0)
+                        .inner_size(360.0, 220.0)
                         .resizable(false)
                         .center()
                         .always_on_top(true)

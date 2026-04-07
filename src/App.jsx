@@ -26,7 +26,7 @@ import MediaBin from './components/MediaBin/MediaBin';
 import EditMode from './components/EditMode/EditMode';
 import TextImport from './TextImport';
 import AIAssistant from './AIAssistant';
-import { useUpdateCheck } from './UpdateNotifier';
+import { useUpdater } from './useUpdater';
 import UpdateModal from './UpdateModal';
 import StageMode from './StageMode';
 import FlowEditor from './FlowEditor';
@@ -230,11 +230,11 @@ export default function App() {
   const [showWindowedPicker, setShowWindowedPicker] = useState(false);
   const [showTrailer,        setShowTrailer]        = useState(false);
   const [showTutorial,       setShowTutorial]       = useState(false); // shown after trailer
-  const [update, dismissUpdate] = useUpdateCheck();
-const [skippedVersion, setSkippedVersion] = React.useState(
-  () => localStorage.getItem('ef_skipped_version') || null
-);
-const showUpdateModal = update && update.version !== skippedVersion;
+  const { updateInfo, status: updStatus, progress: updProgress, error: updError, installUpdate, dismiss: dismissUpdate } = useUpdater();
+  const [skippedVersion, setSkippedVersion] = React.useState(
+    () => localStorage.getItem('ef_skipped_version') || null
+  );
+  const showUpdateModal = updateInfo && updateInfo.version !== skippedVersion;
 
   const handleTextImport = useCallback(({ title, slides, destType, destId }) => {
     const songId = 'txt_' + Date.now();
@@ -923,22 +923,20 @@ const showUpdateModal = update && update.version !== skippedVersion;
     >
       {/* Audio element is fully uncontrolled — src set imperatively in playTrack */}
       {showUpdateModal && (
-  <UpdateModal
-    updateInfo={{
-      version: update.version,
-      notes: update.notes,
-      pubDate: update.date,
-      downloadUrl: update.url,
-      gatekeeperCommand: `xattr -rd com.apple.quarantine /Applications/ElevateFlow.app`,
-    }}
-    onRemindLater={dismissUpdate}
-    onSkip={() => {
-      localStorage.setItem('ef_skipped_version', update.version);
-      setSkippedVersion(update.version);
-      dismissUpdate();
-    }}
-  />
-)}
+        <UpdateModal
+          updateInfo={updateInfo}
+          status={updStatus}
+          progress={updProgress}
+          error={updError}
+          onInstall={installUpdate}
+          onRemindLater={dismissUpdate}
+          onSkip={() => {
+            localStorage.setItem('ef_skipped_version', updateInfo.version);
+            setSkippedVersion(updateInfo.version);
+            dismissUpdate();
+          }}
+        />
+      )}
       {showWindowedPicker && <WindowedOutputPicker onClose={() => setShowWindowedPicker(false)} />}
       {showTrailer && (
         <TrailerVideo onDone={async () => {
