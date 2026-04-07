@@ -40,6 +40,7 @@ jobs:
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
+          updaterJsonKeepUniversal: true
           args: --target universal-apple-darwin
 
       - name: Rename DMG to simple name
