@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ElevateFlow",
-  "version": "0.2.5",
+  "version": "0.2.2",
   "identifier": "com.kfst.elevateflow",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -78,7 +78,11 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "dmg",
+      "app",
+      "nsis"
+    ],
     "icon": [
       "icons/icon-512.png",
       "icons/icon-128.png",
@@ -89,12 +93,10 @@
   },
   "plugins": {
     "updater": {
-      "active": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUyQjVBRUU0RkY3MzI1RDEKUldUUkpYUC81SzYxNGdwUGIwQSs4YjVsNHM1OFF2bVNaak5LN0ZoOWJTaEVHM29sN1Bvb2Y4SXMK",
+      "pubkey": "YOUR_PUBLIC_KEY_HERE",
       "endpoints": [
-        "https://github.com/jjstudioworks-spec/elevateflow/releases/latest/download/latest.json"
-      ],
-      "dialog": false
+        "https://github.com/jjstudiowork-spec/elevateflow/releases/latest/download/latest.json"
+      ]
     }
   }
 }

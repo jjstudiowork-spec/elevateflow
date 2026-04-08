@@ -9,6 +9,7 @@ permissions:
   contents: write
 
 jobs:
+  # ── macOS Universal ───────────────────────────────────────────
   build-macos:
     runs-on: macos-latest
     steps:
@@ -43,15 +44,46 @@ jobs:
           updaterJsonKeepUniversal: true
           args: --target universal-apple-darwin
 
-      - name: Rename DMG to simple name
+      - name: Copy DMG with simple name
         run: |
           cd src-tauri/target/universal-apple-darwin/release/bundle/dmg
           DMG=$(ls *.dmg | head -1)
           cp "$DMG" ElevateFlow.dmg
 
-      - name: Upload renamed DMG to release
+      - name: Upload simple DMG
         uses: softprops/action-gh-release@v2
         with:
           files: src-tauri/target/universal-apple-darwin/release/bundle/dmg/ElevateFlow.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Windows ───────────────────────────────────────────────────
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend deps
+        run: npm install
+
+      - name: Build Windows Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: ElevateFlow ${{ github.ref_name }}
+          releaseBody: ${{ github.event.head_commit.message }}
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
