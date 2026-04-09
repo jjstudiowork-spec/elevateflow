@@ -66,14 +66,11 @@
     "fs:allow-write-text-file",
     "fs:allow-home-write-recursive",
     "fs:allow-home-read-recursive",
-    "fs:allow-desktop-write-recursive",
-    "fs:allow-desktop-read-recursive",
-    "fs:allow-download-write-recursive",
-    "fs:allow-download-read-recursive",
-    "fs:allow-document-write-recursive",
-    "fs:allow-document-read-recursive",
-    "fs:write-all",
-    "fs:read-all",
-    "fs:allow-mkdir"
+    "fs:allow-mkdir",
+    "fs:allow-app-write-recursive",
+    "fs:allow-app-read-recursive",
+    "updater:default",
+    "updater:allow-check",
+    "updater:allow-download-and-install"
   ]
 }
