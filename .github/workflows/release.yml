@@ -12,9 +12,15 @@ jobs:
   # ── macOS Universal ───────────────────────────────────────────
   build-macos:
     runs-on: macos-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Get version
+        id: get_version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -46,16 +52,54 @@ jobs:
 
       - name: Copy DMG with simple name
         run: |
-          cd src-tauri/target/universal-apple-darwin/release/bundle/dmg
-          DMG=$(ls *.dmg | head -1)
-          cp "$DMG" ElevateFlow.dmg
+          VERSION=${{ steps.get_version.outputs.version }}
+          cp "src-tauri/target/universal-apple-darwin/release/bundle/dmg/ElevateFlow_${VERSION}_universal.dmg" ElevateFlow.dmg
 
       - name: Upload simple DMG
         uses: softprops/action-gh-release@v2
         with:
-          files: src-tauri/target/universal-apple-darwin/release/bundle/dmg/ElevateFlow.dmg
+          files: ElevateFlow.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate and upload latest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${{ steps.get_version.outputs.version }}
+          TAG=${{ github.ref_name }}
+          
+          # Find the sig file
+          SIG_FILE=$(find src-tauri/target/universal-apple-darwin/release/bundle -name "*.app.tar.gz.sig" | head -1)
+          TAR_FILE=$(find src-tauri/target/universal-apple-darwin/release/bundle -name "*.app.tar.gz" | head -1)
+          
+          if [ -z "$SIG_FILE" ]; then
+            echo "No sig file found — signing may have failed"
+            SIG=""
+          else
+            SIG=$(cat "$SIG_FILE")
+          fi
+          
+          TAR_URL="https://github.com/jjstudiowork-spec/elevateflow/releases/download/${TAG}/$(basename $TAR_FILE)"
+          
+          cat > latest.json << JSON
+          {
+            "version": "${VERSION}",
+            "notes": "$(git log -1 --pretty=%B | head -1)",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "darwin-universal": {
+                "signature": "${SIG}",
+                "url": "${TAR_URL}"
+              }
+            }
+          }
+          JSON
+          
+          echo "Generated latest.json:"
+          cat latest.json
+          
+          gh release upload ${TAG} latest.json --clobber
 
   # ── Windows ───────────────────────────────────────────────────
   build-windows:
@@ -86,4 +130,4 @@ jobs:
           releaseBody: ${{ github.event.head_commit.message }}
           releaseDraft: false
           prerelease: false
-          includeUpdaterJson: true
+          includeUpdaterJson: false
