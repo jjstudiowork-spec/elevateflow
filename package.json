@@ -1,7 +1,7 @@
 {
   "name": "tauri-appworship-presenter",
   "private": true,
-  "version": "0.2.8",
+  "version": "0.2.9",
   "type": "module",
   "scripts": {
     "dev": "bash scripts/clean-tauri.sh && vite",
@@ -23,6 +23,7 @@
     "@tauri-apps/plugin-store": "^2.4.2",
     "@tauri-apps/plugin-updater": "^2.10.0",
     "firebase": "^12.8.0",
+    "jszip": "^3.10.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-qr-code": "^2.0.18",
