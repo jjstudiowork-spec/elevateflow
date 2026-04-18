@@ -467,22 +467,31 @@ export default function ConfigureScreens() {
   const [activeTab,       setActiveTab]       = useState('Hardware');
   const [underscan,       setUnderscan]       = useState(0);
 
-  // Load monitors
+  // Load monitors — use Rust command for proper display names
   useEffect(() => {
     const fetchMon = async () => {
       try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const list = await invoke('get_monitors');
+        if (list?.length > 0) {
+          // Normalize to same shape as Tauri's availableMonitors()
+          const normalized = list.map(m => ({
+            name:        m.name,
+            size:        { width: m.width, height: m.height },
+            position:    { x: m.x, y: m.y },
+            scaleFactor: m.scaleFactor,
+          }));
+          setMonitors(normalized);
+          return;
+        }
+      } catch {}
+      // Fallback to JS API
+      try {
         const { availableMonitors } = await import('@tauri-apps/api/window');
         const list = await availableMonitors();
-        if (list?.length > 0) setMonitors(list);
-        else setTimeout(fetchMon, 1000);
-      } catch {
-        try {
-          const { getCurrentWindow } = await import('@tauri-apps/api/window');
-          const list = await getCurrentWindow().availableMonitors?.() || [];
-          if (list?.length > 0) setMonitors(list);
-          else setTimeout(fetchMon, 1500);
-        } catch { setTimeout(fetchMon, 2000); }
-      }
+        if (list?.length > 0) { setMonitors(list); return; }
+      } catch {}
+      setTimeout(fetchMon, 1500);
     };
     fetchMon();
   }, []);

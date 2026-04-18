@@ -8,7 +8,8 @@
 .edit-mode {
   display: grid;
   grid-template-columns: 180px 1fr 280px;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
   background: #000;
 }
@@ -103,6 +104,8 @@
   overflow: hidden;
   cursor: default;
   user-select: none;
+  flex: 1;
+  min-height: 0;
 }
 
 .edit-canvas__empty {

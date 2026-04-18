@@ -25,7 +25,8 @@ async function main() {
   // ── Get version ──────────────────────────────────────────────
   const pkgPath    = path.join(__dirname, '..', 'package.json');
   const tauriPath  = path.join(__dirname, '..', 'src-tauri', 'tauri.conf.json');
-  const notifPath  = path.join(__dirname, '..', 'src', 'UpdateNotifier.jsx');
+  const notifPath    = path.join(__dirname, '..', 'src', 'UpdateNotifier.jsx');
+  const updaterPath  = path.join(__dirname, '..', 'src', 'useUpdater.js');
 
   const pkg    = JSON.parse(fs.readFileSync(pkgPath,   'utf8'));
   const tauri  = JSON.parse(fs.readFileSync(tauriPath, 'utf8'));
@@ -60,13 +61,23 @@ async function main() {
   );
   fs.writeFileSync(notifPath, notif);
 
+  // ── Update CURRENT_VER in useUpdater.js ────────────────────────
+  if (fs.existsSync(updaterPath)) {
+    let updater = fs.readFileSync(updaterPath, 'utf8');
+    updater = updater.replace(
+      /const CURRENT_VER = '[^']*'/,
+      `const CURRENT_VER = '${version}'`
+    );
+    fs.writeFileSync(updaterPath, updater);
+  }
+
   console.log('  ✓ package.json');
   console.log('  ✓ src-tauri/tauri.conf.json');
   console.log('  ✓ src/UpdateNotifier.jsx');
 
   // ── Git commit + tag + push ───────────────────────────────────
   console.log('\n📦  Committing and tagging...');
-  run('git add package.json src-tauri/tauri.conf.json src/UpdateNotifier.jsx');
+  run('git add package.json src-tauri/tauri.conf.json src/UpdateNotifier.jsx src/useUpdater.js');
   run(`git commit -m "Release v${version}"`);
   run(`git tag v${version}`);
 

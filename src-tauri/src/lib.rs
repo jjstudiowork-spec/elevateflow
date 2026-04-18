@@ -1,4 +1,6 @@
-use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder, Menu};
+use std::sync::OnceLock;
+static FULL_MENU: OnceLock<Menu<tauri::Wry>> = OnceLock::new();
 use tauri::{Manager, Emitter};
 
 mod ndi;
@@ -140,6 +142,91 @@ fn open_audience_window(handle: tauri::AppHandle) {
     }
 }
 
+#[tauri::command]
+fn rebuild_full_menu(app: tauri::AppHandle) {
+    // Signal that the full menu should be restored
+    // The full menu is built in setup() — we trigger a re-setup via event
+    // Simplest approach: just emit rebuild-menu so frontend knows, and
+    // separately build a minimal-but-complete menu here
+    let _ = app.emit("full-menu-active", ());
+    // The actual full menu rebuild happens in set_app_menu_visible(visible=false→true)
+}
+
+#[tauri::command]
+fn set_app_menu_visible(app: tauri::AppHandle, visible: bool) {
+    use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+    // Build minimal menu (Launcher) or restore system menu signal
+    // We emit to the setup handler via a stored state approach
+    // For simplicity: emit event so JS can react if needed
+    let _ = app.emit("app-menu-visibility", visible);
+    // Rebuild menu inline
+    if let Ok(about) = MenuItemBuilder::new("About ElevateFlow").id("about_min").build(&app) {
+        if let Ok(quit) = MenuItemBuilder::new("Quit ElevateFlow").id("quit_min").accelerator("Cmd+Q").build(&app) {
+            if let Ok(ef_menu) = SubmenuBuilder::new(&app, "ElevateFlow").item(&about).separator().item(&quit).build() {
+                if !visible {
+                    // Launcher: minimal menu — ElevateFlow only
+                    if let Ok(menu) = MenuBuilder::new(&app).item(&ef_menu).build() {
+                        let _ = app.set_menu(menu);
+                    }
+                } else {
+                    // Flow: restore the full menu
+                    if let Some(full) = FULL_MENU.get() {
+                        let _ = app.set_menu(full.clone());
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[tauri::command]
+fn get_monitors(app: tauri::AppHandle) -> Vec<serde_json::Value> {
+    let mut result = Vec::new();
+    if let Some(win) = app.get_webview_window("main") {
+        if let Ok(monitors) = win.available_monitors() {
+            // Find the primary monitor (position 0,0 or closest to it)
+            let primary_idx = monitors.iter().enumerate()
+                .min_by_key(|(_, m)| {
+                    let p = m.position();
+                    (p.x.abs() as i64) + (p.y.abs() as i64)
+                })
+                .map(|(i, _)| i)
+                .unwrap_or(0);
+
+            for (i, m) in monitors.iter().enumerate() {
+                let size = m.size();
+                let pos  = m.position();
+                let sf   = m.scale_factor();
+                let logical_w = (size.width as f64 / sf).round() as u32;
+                let logical_h = (size.height as f64 / sf).round() as u32;
+                let is_primary = i == primary_idx;
+
+                // Build a useful display name
+                let position_label = if is_primary {
+                    "Primary".to_string()
+                } else if pos.x > 0 { "Right".to_string() }
+                  else if pos.x < 0 { "Left".to_string() }
+                  else if pos.y > 0 { "Below".to_string() }
+                  else { format!("Display {}", i + 1) };
+
+                let name = format!("{} — {}×{}", position_label, logical_w, logical_h);
+
+                result.push(serde_json::json!({
+                    "name":        name,
+                    "width":       logical_w,
+                    "height":      logical_h,
+                    "x":           (pos.x as f64 / sf).round() as i32,
+                    "y":           (pos.y as f64 / sf).round() as i32,
+                    "scaleFactor": sf,
+                    "index":       i,
+                    "isPrimary":   is_primary,
+                }));
+            }
+        }
+    }
+    result
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -147,7 +234,6 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             open_media_inspector,
             confirm_close,
@@ -162,6 +248,13 @@ pub fn run() {
             ndi::ndi_stop,
             ndi::ndi_send_frame,
             ndi::ndi_status,
+            presentation_start_hosting,
+            presentation_broadcast,
+            presentation_stop_hosting,
+            get_local_ip,
+            get_monitors,
+            set_app_menu_visible,
+            rebuild_full_menu,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -314,7 +407,25 @@ pub fn run() {
                 .item(&prev_slide)
                 .build()?;
 
-            // -------- Screens --------
+            // -------- Presentation Mode --------
+            let start_hosting = MenuItemBuilder::new("Start Hosting")
+                .id("presentation_start_hosting")
+                .accelerator("Cmd+Shift+H")
+                .build(app)?;
+            let join_session = MenuItemBuilder::new("Join Session…")
+                .id("presentation_join_session")
+                .accelerator("Cmd+Shift+J")
+                .build(app)?;
+            let stop_hosting = MenuItemBuilder::new("Stop Hosting")
+                .id("presentation_stop_hosting")
+                .build(app)?;
+
+            let presentation_menu = SubmenuBuilder::new(app, "Presentation Mode")
+                .item(&start_hosting)
+                .item(&join_session)
+                .separator()
+                .item(&stop_hosting)
+                .build()?;
             let audience = MenuItemBuilder::new("Enable Audience")
                 .id("audience")
                 .accelerator("Cmd+1")
@@ -393,6 +504,7 @@ pub fn run() {
                 .item(&view_menu)
                 .build()?;
 
+            let _ = FULL_MENU.set(menu.clone());
             app.set_menu(menu)?;
             Ok(())
         })
@@ -500,6 +612,21 @@ pub fn run() {
                         .unwrap();
                     }
                 }
+                "presentation_start_hosting" => {
+                    if let Some(main_win) = app.get_webview_window("main") {
+                        let _ = main_win.emit("menu-presentation-start-hosting", ());
+                    }
+                }
+                "presentation_join_session" => {
+                    if let Some(main_win) = app.get_webview_window("main") {
+                        let _ = main_win.emit("menu-presentation-join-session", ());
+                    }
+                }
+                "presentation_stop_hosting" => {
+                    if let Some(main_win) = app.get_webview_window("main") {
+                        let _ = main_win.emit("menu-presentation-stop-hosting", ());
+                    }
+                }
                 "windowed_output" => {
                     if let Some(main_win) = app.get_webview_window("main") {
                         let _ = main_win.emit("menu-windowed-output", ());
@@ -526,4 +653,97 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+// ══════════════════════════════════════════════════════════════════
+// PRESENTATION MODE — WebSocket server (host) + client connection
+// ══════════════════════════════════════════════════════════════════
+use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
+use tokio::sync::broadcast;
+
+// Global broadcast channel for slide payloads
+lazy_static::lazy_static! {
+    static ref PRESENTATION_TX: Mutex<Option<broadcast::Sender<String>>> = Mutex::new(None);
+    static ref PRESENTATION_PORT: Mutex<u16> = Mutex::new(0);
+}
+
+#[tauri::command]
+async fn presentation_start_hosting(app: tauri::AppHandle) -> Result<String, String> {
+    use warp::Filter;
+    use futures_util::{StreamExt, SinkExt};
+
+    // Pick a random port
+    let port: u16 = 47823;
+
+    // Create broadcast channel
+    let (tx, _rx) = broadcast::channel::<String>(64);
+    {
+        let mut lock = PRESENTATION_TX.lock().unwrap();
+        *lock = Some(tx.clone());
+        let mut p = PRESENTATION_PORT.lock().unwrap();
+        *p = port;
+    }
+
+    let tx_filter = warp::any().map(move || tx.clone());
+
+    let ws_route = warp::path("ef-presentation")
+        .and(warp::ws())
+        .and(tx_filter)
+        .map(|ws: warp::ws::Ws, tx: broadcast::Sender<String>| {
+            ws.on_upgrade(move |websocket| async move {
+                let mut rx = tx.subscribe();
+                let (mut ws_tx, _ws_rx) = websocket.split();
+                // Forward every broadcast message to this client
+                while let Ok(msg) = rx.recv().await {
+                    if ws_tx.send(warp::ws::Message::text(msg)).await.is_err() {
+                        break;
+                    }
+                }
+            })
+        });
+
+    // Get local IP
+    let ip = local_ip_address::local_ip()
+        .map(|ip| ip.to_string())
+        .unwrap_or_else(|_| "127.0.0.1".to_string());
+
+    // Spawn server
+    tokio::spawn(async move {
+        warp::serve(ws_route)
+            .run(([0, 0, 0, 0], port))
+            .await;
+    });
+
+    // Notify frontend
+    let _ = app.emit("presentation-hosting-started", serde_json::json!({
+        "ip": ip,
+        "port": port,
+        "code": &ip.split('.').last().unwrap_or("??").to_string()
+    }));
+
+    Ok(format!("{}:{}", ip, port))
+}
+
+#[tauri::command]
+fn presentation_broadcast(payload: String) -> Result<(), String> {
+    let lock = PRESENTATION_TX.lock().unwrap();
+    if let Some(tx) = lock.as_ref() {
+        let _ = tx.send(payload);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn presentation_stop_hosting(app: tauri::AppHandle) -> Result<(), String> {
+    let mut lock = PRESENTATION_TX.lock().unwrap();
+    *lock = None;
+    let _ = app.emit("presentation-hosting-stopped", ());
+    Ok(())
+}
+
+#[tauri::command]
+fn get_local_ip() -> String {
+    local_ip_address::local_ip()
+        .map(|ip| ip.to_string())
+        .unwrap_or_else(|_| "127.0.0.1".to_string())
 }

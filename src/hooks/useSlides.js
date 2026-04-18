@@ -15,6 +15,16 @@ export function useSlides(state, dispatch) {
     dispatch({ type: 'UPDATE_SONG_SLIDES', payload: newSlides });
   }, [dispatch]);
 
+  const reorderSlide = useCallback((dragId, targetId) => {
+    const from = slides.findIndex(s => s.id === dragId);
+    const to   = slides.findIndex(s => s.id === targetId);
+    if (from === -1 || to === -1 || from === to) return;
+    const next = [...slides];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    dispatch({ type: 'UPDATE_SONG_SLIDES', payload: next });
+  }, [slides, dispatch]);
+
   const addSlide = useCallback((overrides = {}) => {
     const newId = Date.now();
     const newSlide = {
@@ -161,6 +171,24 @@ export function useSlides(state, dispatch) {
   const slideIndex = slides.indexOf(selectedSlide);
   const nextSlide = slides[slideIndex + 1];
 
+  const handleCopyStyle = useCallback(() => {
+    if (!selectedSlideId) return;
+    const slide = slides.find(s => s.id === selectedSlideId);
+    if (!slide) return;
+    const styleKeys = ['fontFamily','fontSize','fontWeight','textColor','transform','italic','underline','strikethrough','lineSpacing'];
+    const style = {};
+    styleKeys.forEach(k => { style[k] = slide[k]; });
+    dispatch({ type: 'SET_STYLE_CLIPBOARD', payload: style });
+  }, [selectedSlideId, slides, dispatch]);
+
+  const handlePasteStyle = useCallback(() => {
+    const clip = state.styleClipboard;
+    if (!clip || !selectedSlideId) return;
+    Object.entries(clip).forEach(([k, v]) => {
+      if (v !== undefined) updateSlideStyle(k, v);
+    });
+  }, [state.styleClipboard, selectedSlideId, updateSlideStyle]);
+
   return {
     activeSong,
     slides,
@@ -176,12 +204,15 @@ export function useSlides(state, dispatch) {
     updateSlideText,
     updateSlideStyle,
     updateSlideStyles,
+    reorderSlide,
     setSlideGroup,
     assignMediaToSlide,
     assignTriggerToSlide,
     applyTransform,
     sendToAudience,
     updateSlides,
+    handleCopyStyle,
+    handlePasteStyle,
   };
 }
 

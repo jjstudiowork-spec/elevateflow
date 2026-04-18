@@ -393,7 +393,12 @@ function ScreensIcon() {
 }
 
 // ── MAIN TOOLBAR ───────────────────────────────────────────────
-export default function Toolbar({ state, dispatch, selectedSlide, updateSlideStyle, onImportEf, onTextImport, onToggleAI, showAI, activeSong, showMediaBin, onToggleMediaBin }) {
+export default function Toolbar({ 
+  state, dispatch, selectedSlide, updateSlideStyle, 
+  onImportEf, onTextImport, onToggleAI, showAI, 
+  activeSong, showMediaBin, onToggleMediaBin,
+  onImportPptx // 👈 ADD THIS
+}) {
   const { mode, isSynced } = state;
   const [assignments, setAssignments] = useState(loadAssignments);
   const [showThemes,  setShowThemes]  = useState(false);
@@ -471,6 +476,18 @@ export default function Toolbar({ state, dispatch, selectedSlide, updateSlideSty
             </svg>
             <span>Import</span>
           </button>
+
+          {/* PPTX Import */}
+<button 
+  onClick={onImportPptx} 
+  title="Import PowerPoint (.pptx)" 
+  style={pill(false)}
+  onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.75)'; }}
+  onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.38)'; }}
+>
+  <span style={{ fontSize: 14 }}>📊</span>
+  <span>PPTX</span>
+</button>
 
           {/* AI */}
           <button onClick={onToggleAI} title="AI Assistant"

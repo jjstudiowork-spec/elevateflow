@@ -34,7 +34,9 @@ struct NDIVideoFrameV2 {
     timestamp:            i64,
 }
 
-const FOURCC_BGRA: u32 = 0x41524742;
+// NDI FourCC = little-endian: 'B'|('G'<<8)|('R'<<16)|('A'<<24)
+const FOURCC_BGRA: u32 = 0x41524742; // BGRA little-endian (correct)
+const FOURCC_RGBA: u32 = 0x41424752; // RGBA little-endian
 
 // ── NDI Sender ─────────────────────────────────────────────────
 
@@ -118,7 +120,7 @@ fn send_bgra_frame(sender: &Sender, pixels: &[u8], width: i32, height: i32, four
         let frame = NDIVideoFrameV2 {
             xres: width, yres: height,
             FourCC: fourcc,
-            frame_rate_N: 30000, frame_rate_D: 1001,
+            frame_rate_N: 30, frame_rate_D: 1,
             picture_aspect_ratio: width as f32 / height as f32,
             frame_format_type: 1, // progressive
             timecode: i64::MIN,
@@ -213,11 +215,12 @@ pub fn ndi_send_frame(role: String, pixels_b64: String, width: i32, height: i32)
     let pixels = base64::engine::general_purpose::STANDARD
         .decode(&pixels_b64).map_err(|e| e.to_string())?;
 
+    // Canvas gives RGBA — send as RGBA directly, no conversion needed
     let guard = get_state(&role).lock().unwrap();
     if let Some(state) = guard.as_ref() {
         let s = state.lock().unwrap();
         if let Some(sender) = &s.sender {
-            send_bgra_frame(sender, &pixels, width, height, FOURCC_BGRA);
+            send_bgra_frame(sender, &pixels, width, height, FOURCC_RGBA);
         }
     }
     Ok(())
@@ -236,4 +239,11 @@ pub fn ndi_status() -> serde_json::Value {
         "stage":     stage,
         "available": ndi_available(),
     })
+}
+
+fn rgba_to_bgra(pixels: &mut [u8]) {
+    let len = pixels.len() - (pixels.len() % 4); // ensure divisible by 4
+    for i in (0..len).step_by(4) {
+        pixels.swap(i, i + 2);
+    }
 }

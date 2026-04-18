@@ -30,6 +30,12 @@ function ReleaseNotes({ notes }) {
 
 export default function UpdateModal({ updateInfo, status, progress, error, onInstall, onRemindLater, onSkip }) {
   const mounted = useRef(false);
+  const [currentVersion, setCurrentVersion] = useState('…');
+  useEffect(() => {
+    import('@tauri-apps/api/app').then(({ getVersion }) =>
+      getVersion().then(v => setCurrentVersion(v)).catch(() => setCurrentVersion('—'))
+    ).catch(() => {});
+  }, []);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   const isDownloading = status === 'downloading';
@@ -100,6 +106,13 @@ export default function UpdateModal({ updateInfo, status, progress, error, onIns
               {formattedDate && (
                 <div style={{ fontSize: 11, color: '#52525b', marginTop: 3 }}>Released {formattedDate}</div>
               )}
+            </div>
+            <div style={{
+              padding: '3px 9px', borderRadius: 6, flexShrink: 0,
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+              fontSize: 10, color: '#3f3f46', fontWeight: 600, marginTop: 2,
+            }}>
+              v{currentVersion}
             </div>
           </div>
 

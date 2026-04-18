@@ -1,10 +1,8 @@
 /**
  * useNdiCapture.js
- * Captures frames from the output window at ~30fps and sends them to
- * the Rust NDI sender via invoke('ndi_send_frame').
- * 
- * Usage: call startCapture(role) to begin, stopCapture(role) to end.
+ * Captures frames and sends RAW pixel data to Rust NDI sender
  */
+
 import { invoke } from '@tauri-apps/api/core';
 
 const captureLoops = {};
@@ -14,41 +12,58 @@ export function startNdiCapture(role) {
 
   const canvas = document.createElement('canvas');
   const ctx    = canvas.getContext('2d');
-  let   raf    = null;
-  let   active = true;
+
+  let raf    = null;
+  let active = true;
 
   const loop = async () => {
     if (!active) return;
+
     try {
-      // Capture the entire visible page into a canvas
       const w = window.innerWidth;
       const h = window.innerHeight;
+
+      // Resize canvas if needed
       if (canvas.width !== w || canvas.height !== h) {
         canvas.width  = w;
         canvas.height = h;
       }
 
-      // Draw the current window into the canvas using html2canvas-style approach
-      // We use the <html> element via a foreignObject SVG trick
-      // This is the only cross-origin-safe way in a Tauri WebView
-      const data = ctx.getImageData(0, 0, w, h);
+      // ✅ DRAW TEST FRAME (so we KNOW pipeline works)
+      ctx.fillStyle = 'red';
+      ctx.fillRect(0, 0, w, h);
 
-      // Convert to base64
-      const b64 = canvasToBase64(canvas);
+      // ✅ GET RAW PIXELS (RGBA)
+      const imageData = ctx.getImageData(0, 0, w, h);
+      const pixels = imageData.data;
+
+      // ✅ CONVERT TO BASE64 (RAW, NOT PNG)
+      const b64 = uint8ToBase64(pixels);
+
       if (b64) {
         await invoke('ndi_send_frame', {
           role,
           pixelsB64: b64,
-          width:     w,
-          height:    h,
+          width: w,
+          height: h,
         }).catch(() => {});
       }
-    } catch {}
+
+    } catch (err) {
+      console.error('NDI capture error:', err);
+    }
 
     raf = setTimeout(loop, 1000 / 30); // ~30fps
   };
 
-  captureLoops[role] = { stop: () => { active = false; clearTimeout(raf); delete captureLoops[role]; } };
+  captureLoops[role] = {
+    stop: () => {
+      active = false;
+      clearTimeout(raf);
+      delete captureLoops[role];
+    }
+  };
+
   loop();
 }
 
@@ -56,10 +71,15 @@ export function stopNdiCapture(role) {
   captureLoops[role]?.stop();
 }
 
-// ── Frame capture via drawWindow (Tauri WebView supports this) ──
-function canvasToBase64(canvas) {
-  try {
-    // Remove the data:image/png;base64, prefix
-    return canvas.toDataURL('image/png').split(',')[1];
-  } catch { return null; }
+// ✅ SAFE BASE64 ENCODER (NO TRUNCATION)
+function uint8ToBase64(uint8) {
+  let binary = '';
+  const chunkSize = 0x8000;
+
+  for (let i = 0; i < uint8.length; i += chunkSize) {
+    const sub = uint8.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...sub);
+  }
+
+  return btoa(binary);
 }

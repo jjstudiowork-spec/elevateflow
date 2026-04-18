@@ -161,7 +161,7 @@ export default function AudienceView() {
   // Only convert if it's a raw filesystem path — not already an asset:// URL
   const toSrc = (val) => {
     if (!val) return null;
-    if (val.startsWith('asset://') || val.startsWith('https://asset.localhost') || val.startsWith('blob:') || val.startsWith('http')) return val;
+    if (val.startsWith('data:') || val.startsWith('asset://') || val.startsWith('https://asset.localhost') || val.startsWith('blob:') || val.startsWith('http')) return val;
     return convertFileSrc(val);
   };
   const videoSrc   = toSrc(videoPath);
@@ -201,7 +201,7 @@ export default function AudienceView() {
       }}>
 
       {/* ── Background video / image ── */}
-      {videoSrc && videoPath?.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/i) ? (
+      {videoSrc && (videoPath?.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/i) || videoPath?.startsWith('data:image') || slide.videoFit === 'contain') ? (
         <img
           key={videoSrc}
           src={videoSrc}

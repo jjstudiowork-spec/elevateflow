@@ -12,6 +12,18 @@
 ───────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Prevent text selection across the entire app */
+body, #root {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Re-enable selection only inside inputs and contenteditable */
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 html, body, #root {
   height: 100%;
   /* Transparent so window chrome shows through toolbar glass */
@@ -834,6 +846,8 @@ input[type=range]::-webkit-slider-thumb {
   min-height: 0;
   background: #070709;
   position: relative;
+  /* Force children to not overflow */
+  container-type: size;
 }
 
 .preview-screen {
@@ -841,16 +855,20 @@ input[type=range]::-webkit-slider-thumb {
   background: #000;
   overflow: hidden;
   container-type: inline-size;
-  /* Fit inside box while maintaining aspect ratio — letterbox/pillarbox */
+  /* Always letterbox/pillarbox — aspect-ratio drives dimensions */
+  /* width is constrained by box, height follows aspect ratio */
+  width: 100%;
+  height: auto;
   max-height: 100%;
-  max-width: 100%;
-  height: 100%;
-  width: auto;
-  /* aspect-ratio set dynamically via inline style */
+  /* Shrink width if needed to keep aspect ratio */
+  aspect-ratio: var(--preview-ratio, 16/9);
+  /* Fallback: if width would exceed height constraint, cap it */
+  max-width: calc(100% * var(--preview-w, 16) / var(--preview-h, 9) * 1);
   border-radius: 6px;
   box-shadow:
     0 0 0 1px rgba(255,255,255,0.07),
     0 8px 32px rgba(0,0,0,0.7);
+  flex-shrink: 0;
 }
 
 .preview-screen__bg-video {
@@ -1156,28 +1174,6 @@ input[type=range]::-webkit-slider-thumb {
 }
 
 /* ── Show Controls Toolbar ── */
-.show-controls-toolbar {
-  display: flex;
-  background: var(--bg-panel-mid);
-  border-bottom: 1px solid var(--border-faint);
-  height: 38px;
-  flex-shrink: 0;
-}
-
-.show-controls-toolbar__btn {
-  flex: 1;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  display: grid;
-  place-items: center;
-  color: var(--text-faint);
-}
-
-.show-controls-toolbar__btn.active {
-  border-bottom-color: var(--gold-500);
-  background: var(--gold-micro);
-}
 
 /* ── Audio Bins ── */
 .right-panel__content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
@@ -1745,6 +1741,15 @@ input[type=range]::-webkit-slider-thumb {
   flex: 1;
   height: 1px;
   background: #1e1e1e;
+}
+
+/* ── Slide reorder target indicator ─────────────────────────── */
+.slide-card--reorder-target {
+  outline: 2px solid #60a5fa !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(96,165,250,0.2) !important;
+  transform: scale(0.97);
+  transition: transform 0.1s, outline 0.1s;
 }
 
 /* ── Lasso selection ─────────────────────────────────────────── */

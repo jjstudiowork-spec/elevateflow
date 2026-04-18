@@ -2,6 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { HashRouter, Routes, Route } from "react-router-dom";
 import App from "./App";
+import Launcher from "./Launcher";
+import StreamStudio from "./StreamStudio";
 import SplashScreen from "./SplashScreen";
 import CloseConfirmWindow from "./CloseConfirmWindow";
 import AboutWindow from "./AboutWindow";
@@ -14,6 +16,7 @@ import Graphics from "./Graphics";
 import AudienceView from "./AudienceView";
 import StageView from "./StageView";
 import Production from "./Production";
+import Mix from './Mix'; // <-- Import the new Mix component
 
 // Apply saved theme before render — prevents flash
 const _savedTheme = localStorage.getItem('ef_theme') || 'dark';
@@ -33,7 +36,16 @@ import('@tauri-apps/api/event').then(({ listen }) => {
 ReactDOM.createRoot(document.getElementById("root")).render(
   <HashRouter>
     <Routes>
-      <Route path="/"                  element={<App />} />
+      {/* ── App Launcher (default — shown after splash) ── */}
+      <Route path="/"                  element={<Launcher />} />
+
+      {/* ── Studios ── */}
+      <Route path="/app"               element={<App />} />
+      <Route path="/stream"            element={<StreamStudio />} />
+      {/* The new Audio Mixer UI */}
+        <Route path="/mix" element={<Mix />} />
+
+      {/* ── System windows ── */}
       <Route path="/splash"            element={<SplashScreen />} />
       <Route path="/close-confirm"     element={<CloseConfirmWindow />} />
       <Route path="/about"             element={<AboutWindow />} />

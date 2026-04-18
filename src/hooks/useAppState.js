@@ -100,6 +100,15 @@ const initialState = {
   slideCardSize: 180, // slide card width in px
   // Hotkeys: { [key: string]: slideId }  e.g. { 'v': 'slide-123' }
   hotkeys: {},
+  // Presentation Mode
+  isPresentationHost:    false,
+  isPresentationClient:  false,
+  presentationHostAddress: null,
+  showJoinDialog:        false,
+  // Remote slide (received from host as client)
+  remoteSlide:   null,
+  remoteVideo:   null,
+  remoteOverlay: null,
 
   // Edit Mode
   dragOffset: { x: 0, y: 0 },
@@ -367,6 +376,23 @@ function reducer(state, action) {
         ),
       };
     }
+    case 'SET_PRESENTATION_HOST':
+      return { ...state, isPresentationHost: action.payload };
+    case 'SET_PRESENTATION_CLIENT':
+      return { ...state, isPresentationClient: action.payload };
+    case 'SET_PRESENTATION_HOST_ADDRESS':
+      return { ...state, presentationHostAddress: action.payload };
+    case 'SET_SHOW_JOIN_DIALOG':
+      return { ...state, showJoinDialog: action.payload };
+    case 'APPLY_REMOTE_SLIDE':
+      return {
+        ...state,
+        remoteSlide:   action.payload,
+        remoteVideo:   action.payload?.videoPath   ?? state.remoteVideo,
+        remoteOverlay: action.payload?.overlayPath ?? state.remoteOverlay,
+      };
+    case 'CLEAR_ALL_REMOTE':
+      return { ...state, remoteSlide: null, remoteVideo: null, remoteOverlay: null };
     case 'SET_HOTKEY': {
       const { key, slideId } = action.payload;
       const next = { ...state.hotkeys };

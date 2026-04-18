@@ -61,6 +61,12 @@ export async function launchOutputWindow(role) {
   for (let i = 0; i < screens.length; i++) {
     const screen = screens[i];
 
+    // Skip pure placeholders — no physical monitor assigned, no NDI
+    if (screen.isPlaceholder && !screen.isNdi) {
+      results.push({ ok: false, label: `placeholder_${i}`, reason: 'placeholder' });
+      continue;
+    }
+
     if (screen.isNdi) {
       const result = await launchNdiScreen(role, screen, i);
       results.push(result);

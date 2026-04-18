@@ -87,6 +87,31 @@ function StageLayoutPreview({ state, selectedSlide, nextSlide }) {
 // AUDIENCE PREVIEW
 // ─────────────────────────────────────────────────────────────────
 function AudiencePreview({ state, dispatch, selectedSlide, nextSlide, videoRef, audioRef, onTimeUpdate }) {
+  // Keep preview video src in sync with liveVideo state imperatively
+  const prevVideoSrc = React.useRef(null);
+  React.useEffect(() => {
+    if (!videoRef?.current) return;
+    const { liveVideo } = state;
+    const toSrc = (val) => {
+      if (!val) return null;
+      if (val.startsWith('data:') || val.startsWith('asset://') || val.startsWith('blob:') || val.startsWith('http')) return val;
+      try { return convertFileSrc(val); } catch { return null; }
+    };
+    if (!liveVideo) {
+      // Clear video
+      if (prevVideoSrc.current !== null) {
+        prevVideoSrc.current = null;
+        videoRef.current.src = '';
+      }
+      return;
+    }
+    const newSrc = toSrc(liveVideo);
+    if (newSrc && newSrc !== prevVideoSrc.current) {
+      prevVideoSrc.current = newSrc;
+      videoRef.current.src = newSrc;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [state.liveVideo, videoRef]);
   const { liveVideo, activeOverlay, activePreview, showPreviewDropdown } = state;
 
   // Read screen assignments to get the correct aspect ratio for each output
@@ -147,7 +172,7 @@ function AudiencePreview({ state, dispatch, selectedSlide, nextSlide, videoRef, 
   // Only convert if it's a raw filesystem path — not already an asset:// URL
   const toSrc = (val) => {
     if (!val) return null;
-    if (val.startsWith('asset://') || val.startsWith('https://asset.localhost') || val.startsWith('blob:') || val.startsWith('http')) return val;
+    if (val.startsWith('asset://') || val.startsWith('https://asset.localhost') || val.startsWith('blob:') || val.startsWith('http') || val.startsWith('data:')) return val;
     return convertFileSrc(val);
   };
   const videoSrc   = toSrc(liveVideo);
@@ -159,19 +184,21 @@ function AudiencePreview({ state, dispatch, selectedSlide, nextSlide, videoRef, 
       <div className="preview-screen-box">
         {/* VU Meter */}
         <VuMeter audioRef={audioRef} videoRef={videoRef} state={state} />
-        <div className="preview-screen" style={{ aspectRatio }}>
+        <div className="preview-screen" style={{
+          aspectRatio,
+          '--preview-ratio': aspectRatio,
+        }}>
         {isAudiencePreview ? (
           <>
             {/* Background video or image */}
-            {videoSrc && liveVideo?.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/i) ? (
-              <img key={videoSrc} src={videoSrc}
+            {videoSrc && (liveVideo?.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/i) || liveVideo?.startsWith('data:image') || selectedSlide?.videoFit === 'contain') ? (
+              <img src={videoSrc}
                 className="preview-screen__bg-video"
-                style={{ objectFit: 'cover', width: '100%', height: '100%', position: 'absolute', inset: 0 }}
+                style={{ objectFit: selectedSlide?.videoFit || 'cover', width: '100%', height: '100%', position: 'absolute', inset: 0 }}
               />
             ) : videoSrc ? (
               <video
                 ref={videoRef}
-                key={videoSrc}
                 src={videoSrc}
                 className="preview-screen__bg-video"
                 autoPlay muted loop
@@ -179,7 +206,7 @@ function AudiencePreview({ state, dispatch, selectedSlide, nextSlide, videoRef, 
                 onLoadedMetadata={onTimeUpdate}
                 onPlay={() => dispatch({ type: 'SET_IS_PLAYING', payload: true })}
                 onPause={() => dispatch({ type: 'SET_IS_PLAYING', payload: false })}
-                style={{ animation: `ef-preview-fade ${state.fadeDuration ?? 0.5}s ease` }}
+                style={{ objectFit: selectedSlide?.videoFit || state.liveVideoFit || 'cover' }}
               />
             ) : null}
 
@@ -235,11 +262,22 @@ function AudiencePreview({ state, dispatch, selectedSlide, nextSlide, videoRef, 
       </div>{/* end preview-screen-box */}
 
       {/* View selector */}
-      <div className="preview-view-selector">
-        <div className="preview-view-selector__inner">
+      <div style={{
+        display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
+        padding: '0 8px', height: 24, background: '#050507',
+        borderBottom: '1px solid rgba(255,255,255,0.04)', flexShrink: 0,
+      }}>
+        <div style={{ position: 'relative' }}>
           <button
-            className="preview-view-selector__btn"
             onClick={() => dispatch({ type: 'TOGGLE_PREVIEW_DROPDOWN' })}
+            style={{
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              fontSize: 9, fontWeight: 800, letterSpacing: 0.8,
+              color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: 4,
+              padding: '2px 6px', borderRadius: 4, transition: 'color 0.12s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
           >
             ▾ {activePreview.toUpperCase()}
           </button>
@@ -279,9 +317,9 @@ function AudiencePreview({ state, dispatch, selectedSlide, nextSlide, videoRef, 
               </div>
             );
           })()}
+          </div>
         </div>
       </div>
-    </div>
   );
 }
 
@@ -289,22 +327,50 @@ function AudiencePreview({ state, dispatch, selectedSlide, nextSlide, videoRef, 
 // CLEAR BAR
 // ─────────────────────────────────────────────────────────────────
 function ClearBar({ onClearAll, onClearText, onClearVideo, onClearOverlay, onClearAudio }) {
+  const btnBase = {
+    flex: 1, height: 30, borderRadius: 8, cursor: 'pointer',
+    border: '1px solid rgba(255,255,255,0.07)',
+    background: 'rgba(255,255,255,0.04)',
+    color: 'rgba(255,255,255,0.3)',
+    transition: 'all 0.12s',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  };
+  const hover = (e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; };
+  const leave = (e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; };
+
+  // X clears everything including audio
+  const handleClearAll = () => {
+    onClearAll?.();
+    onClearAudio?.();
+  };
+
   return (
-    <div className="clear-bar">
-      <button className="clear-bar__all" onClick={onClearAll} title="Clear Everything">
-        <XIcon size={16} color="#ef4444" />
+    <div style={{ display: 'flex', gap: 4, padding: '5px 8px', background: '#0a0a0d', borderBottom: '1px solid rgba(255,255,255,0.04)', flexShrink: 0 }}>
+      {/* Red X — clears everything */}
+      <button onClick={handleClearAll} title="Clear All"
+        style={{ ...btnBase, flex: 'none', width: 28, height: 28, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.18)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.2)'; }}>
+        <XIcon size={12} color="#f87171" />
       </button>
-      <div className="clear-bar__layers">
-        <button className="clear-bar__layer" onClick={onClearText} title="Clear Text"><TextIcon /></button>
-        <button className="clear-bar__layer" onClick={onClearVideo} title="Clear Video"><VideoLayerIcon /></button>
-        <button className="clear-bar__layer" onClick={onClearOverlay} title="Clear Overlay"><LayersIcon /></button>
-        <button className="clear-bar__layer" onClick={onClearAudio} title="Clear Audio">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
-            <line x1="4" y1="4" x2="20" y2="20" stroke="#888"/>
-          </svg>
-        </button>
-      </div>
+      {/* Text */}
+      <button style={{ ...btnBase, height: 28 }} onClick={onClearText} title="Clear Text" onMouseEnter={hover} onMouseLeave={leave}>
+        <TextIcon />
+      </button>
+      {/* Video */}
+      <button style={{ ...btnBase, height: 28 }} onClick={onClearVideo} title="Clear Video" onMouseEnter={hover} onMouseLeave={leave}>
+        <VideoLayerIcon />
+      </button>
+      {/* Overlay */}
+      <button style={{ ...btnBase, height: 28 }} onClick={onClearOverlay} title="Clear Overlay" onMouseEnter={hover} onMouseLeave={leave}>
+        <LayersIcon />
+      </button>
+      {/* Audio */}
+      <button style={{ ...btnBase, height: 28 }} onClick={onClearAudio} title="Clear Audio" onMouseEnter={hover} onMouseLeave={leave}>
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+        </svg>
+      </button>
     </div>
   );
 }
@@ -313,93 +379,132 @@ function ClearBar({ onClearAll, onClearText, onClearVideo, onClearOverlay, onCle
 // VU METER
 // ─────────────────────────────────────────────────────────────────
 function VuMeter({ audioRef, videoRef, state }) {
-  const canvasRef   = React.useRef(null);
-  const animRef     = React.useRef(null);
-  const analyserRef = React.useRef(null);
-  const splitterRef = React.useRef(null);
+  const canvasRef        = React.useRef(null);
+  const animRef          = React.useRef(null);
   const channelAnalysers = React.useRef([]);
-  const sourceRef   = React.useRef(null);
-  const ctxRef      = React.useRef(null);
-  const [channels,  setChannels] = React.useState(2);
+  const sourceRef        = React.useRef(null);
+  const ctxRef           = React.useRef(null);
+  const peakRef          = React.useRef([]);   // peak hold values per channel
+  const peakTimerRef     = React.useRef([]);   // decay timers per channel
+  const [channels, setChannels] = React.useState(2);
 
   const { isPlaying, isAudioPlaying, transportTab } = state;
   const isActive = transportTab === 'video' ? isPlaying : isAudioPlaying;
   const mediaEl  = transportTab === 'video' ? videoRef?.current : audioRef?.current;
 
+  // Update channel count when audio output device changes
+  React.useEffect(() => {
+    const handler = () => {
+      if (!ctxRef.current) return;
+      const ac = ctxRef.current;
+      const numCh = Math.max(2, Math.min(8, ac.destination.maxChannelCount || ac.destination.channelCount || 2));
+      if (numCh !== channels) {
+        setChannels(numCh);
+        peakRef.current      = new Array(numCh).fill(0);
+        peakTimerRef.current = new Array(numCh).fill(0);
+      }
+    };
+    window.addEventListener('ef-audio-sink-changed', handler);
+    return () => window.removeEventListener('ef-audio-sink-changed', handler);
+  }, [channels]);
+
+  // Wire up AudioContext + analyser nodes for each channel
   React.useEffect(() => {
     if (!mediaEl) return;
     try {
-      if (!ctxRef.current) {
-        ctxRef.current = new (window.AudioContext || window.webkitAudioContext)();
-      }
+      if (!ctxRef.current) ctxRef.current = new (window.AudioContext || window.webkitAudioContext)();
       const ac = ctxRef.current;
       if (ac.state === 'suspended') ac.resume();
+      if (sourceRef.current?._el === mediaEl) return;
+      try { sourceRef.current?.disconnect(); } catch {}
 
-      if (sourceRef.current?._el !== mediaEl) {
-        try { sourceRef.current?.disconnect(); } catch {}
-        const src = ac.createMediaElementSource(mediaEl);
-        src._el = mediaEl;
+      const numCh = Math.max(2, Math.min(8, ac.destination.maxChannelCount || ac.destination.channelCount || 2));
+      setChannels(numCh);
+      peakRef.current = new Array(numCh).fill(0);
+      peakTimerRef.current = new Array(numCh).fill(0);
 
-        // Detect channel count from device (stored in localStorage)
-        const numCh = Math.max(2, Math.min(8, ac.destination.channelCount || 2));
-        setChannels(numCh);
-
-        // Splitter → one analyser per channel
-        const splitter = ac.createChannelSplitter(numCh);
-        const analysers = [];
-        for (let i = 0; i < numCh; i++) {
-          const a = ac.createAnalyser();
-          a.fftSize = 256;
-          a.smoothingTimeConstant = 0.8;
-          splitter.connect(a, i, 0);
-          analysers.push(a);
-        }
-        src.connect(splitter);
-        src.connect(ac.destination);
-
-        sourceRef.current = src;
-        splitterRef.current = splitter;
-        channelAnalysers.current = analysers;
-        // Keep single analyser for fallback
-        analyserRef.current = analysers[0];
+      const src      = ac.createMediaElementSource(mediaEl);
+      const splitter = ac.createChannelSplitter(numCh);
+      const analysers = [];
+      for (let i = 0; i < numCh; i++) {
+        const a = ac.createAnalyser();
+        a.fftSize = 512;
+        a.smoothingTimeConstant = 0.75;
+        splitter.connect(a, i, 0);
+        analysers.push(a);
       }
+      src.connect(splitter);
+      src.connect(ac.destination);
+      src._el = mediaEl;
+      sourceRef.current        = src;
+      channelAnalysers.current = analysers;
     } catch {}
   }, [mediaEl]);
 
+  // Draw loop — smooth gradient bars with peak hold
   React.useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx2d = canvas.getContext('2d');
-
-    const BAR_W  = 7;
-    const GAP    = 3;
-    const NUM_SEG = 20;
+    const ctx = canvas.getContext('2d');
+    const BAR_W = 3;
+    const GAP   = 2;
 
     const draw = () => {
       animRef.current = requestAnimationFrame(draw);
-      const numCh = channelAnalysers.current.length || 1;
+      const analysers = channelAnalysers.current;
+      const numCh = analysers.length || channels;
       const W = numCh * (BAR_W + GAP) - GAP;
-      const H = 120;
+      const H = canvas.height;
       if (canvas.width !== W) canvas.width = W;
-      if (canvas.height !== H) canvas.height = H;
-      ctx2d.clearRect(0, 0, W, H);
+      ctx.clearRect(0, 0, W, H);
 
-      channelAnalysers.current.forEach((analyser, ch) => {
+      analysers.forEach((analyser, ch) => {
         const data = new Uint8Array(analyser.frequencyBinCount);
         analyser.getByteFrequencyData(data);
-        const avg = data.reduce((a, b) => a + b, 0) / data.length;
-        const level = avg / 255;
-        const filled = Math.round(level * NUM_SEG);
-        const xOff = ch * (BAR_W + GAP);
-        const segH = H / NUM_SEG - 1;
+        const rms   = Math.sqrt(data.reduce((s, v) => s + (v / 255) ** 2, 0) / data.length);
+        const level = Math.min(1, rms * 2.8);
+        const xOff  = ch * (BAR_W + GAP);
+        const fillH = Math.round(level * H);
 
-        for (let i = 0; i < NUM_SEG; i++) {
-          const y = H - (i + 1) * (segH + 1);
-          const pct = i / NUM_SEG;
-          const r = pct > 0.6 ? 255 : Math.round(pct / 0.6 * 180);
-          const g = pct > 0.6 ? Math.round((1 - (pct - 0.6) / 0.4) * 200) : 200;
-          ctx2d.fillStyle = i < filled ? `rgb(${r},${g},0)` : 'rgba(255,255,255,0.04)';
-          ctx2d.fillRect(xOff, y, BAR_W, segH);
+        // Peak hold
+        if (level > peakRef.current[ch]) {
+          peakRef.current[ch]      = level;
+          peakTimerRef.current[ch] = 50;
+        } else if (peakTimerRef.current[ch] > 0) {
+          peakTimerRef.current[ch]--;
+        } else {
+          peakRef.current[ch] = Math.max(0, peakRef.current[ch] - 0.012);
+        }
+
+        // Track background
+        ctx.fillStyle = 'rgba(255,255,255,0.04)';
+        ctx.beginPath();
+        ctx.roundRect(xOff, 0, BAR_W, H, 2);
+        ctx.fill();
+
+        if (fillH > 0) {
+          // Smooth gradient bar — green at bottom, yellow at 60%, red at top
+          const grad = ctx.createLinearGradient(0, H, 0, H - fillH);
+          grad.addColorStop(0,    'rgba(34,197,94,0.9)');   // green
+          grad.addColorStop(0.60, 'rgba(34,197,94,0.9)');
+          grad.addColorStop(0.75, 'rgba(250,204,21,0.95)'); // yellow
+          grad.addColorStop(0.88, 'rgba(251,146,60,0.95)'); // orange
+          grad.addColorStop(1.0,  'rgba(239,68,68,1)');     // red
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.roundRect(xOff, H - fillH, BAR_W, fillH, 2);
+          ctx.fill();
+        }
+
+        // Peak dot — 2px bright line
+        const peakY = Math.round((1 - peakRef.current[ch]) * H);
+        if (peakY < H - 2) {
+          const pPct = peakRef.current[ch];
+          ctx.fillStyle = pPct > 0.88 ? '#ef4444'
+            : pPct > 0.75 ? '#fb923c'
+            : pPct > 0.60 ? '#facc15'
+            : '#4ade80';
+          ctx.fillRect(xOff, peakY, BAR_W, 2);
         }
       });
     };
@@ -408,14 +513,22 @@ function VuMeter({ audioRef, videoRef, state }) {
     return () => cancelAnimationFrame(animRef.current);
   }, [channels]);
 
+  const numCh = channelAnalysers.current.length || channels;
+  const meterW = numCh * (3 + 2) - 2;
+
   return (
-    <canvas ref={canvasRef}
+    <canvas
+      ref={canvasRef}
+      width={meterW}
+      height={120}
       style={{
-        position: 'absolute', left: 4, top: '50%',
+        position:  'absolute',
+        right:     8,
+        top:       '50%',
         transform: 'translateY(-50%)',
-        zIndex: 10, borderRadius: 2,
-        opacity: isActive ? 1 : 0.2,
-        transition: 'opacity 0.3s',
+        zIndex:    10,
+        opacity:   isActive ? 1 : 0.12,
+        transition:'opacity 0.4s',
       }}
     />
   );
@@ -478,72 +591,92 @@ function TransportBar({
     return () => el.removeEventListener('seeked', sync);
   }, [videoRef]);
 
+  const S = {
+    root: {
+      background: '#0a0a0d',
+      borderBottom: '1px solid rgba(255,255,255,0.05)',
+      flexShrink: 0, padding: '6px 10px 8px',
+    },
+    tabs: { display: 'flex', gap: 2, marginBottom: 6 },
+    tab: (active) => ({
+      flex: 1, height: 22, borderRadius: 5, cursor: 'pointer',
+      background: active ? 'rgba(212,175,55,0.1)' : 'transparent',
+      border: `1px solid ${active ? 'rgba(212,175,55,0.3)' : 'rgba(255,255,255,0.06)'}`,
+      color: active ? '#D4AF37' : 'rgba(255,255,255,0.25)',
+      fontSize: 9, fontWeight: 800, letterSpacing: 1, transition: 'all 0.12s',
+    }),
+    name: {
+      fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600,
+      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      marginBottom: 5, paddingLeft: 2,
+    },
+    progressRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 },
+    time: { fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', flexShrink: 0 },
+    controlsRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
+    btn: {
+      width: 30, height: 30, borderRadius: 8, cursor: 'pointer',
+      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+      color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      transition: 'all 0.12s',
+    },
+    playBtn: (active) => ({
+      width: 38, height: 38, borderRadius: 10, cursor: 'pointer',
+      background: active ? 'rgba(212,175,55,0.14)' : 'rgba(255,255,255,0.06)',
+      border: `1px solid ${active ? 'rgba(212,175,55,0.4)' : 'rgba(255,255,255,0.1)'}`,
+      color: active ? '#D4AF37' : 'rgba(255,255,255,0.7)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      transition: 'all 0.15s',
+    }),
+    volRow: { display: 'flex', alignItems: 'center', gap: 4, flex: 1 },
+  };
+
   return (
-    <div className="transport-bar">
-      {/* Tab switcher */}
-      <div className="transport-bar__tabs">
+    <div style={S.root}>
+      <div style={S.tabs}>
         {['video', 'audio'].map(tab => (
-          <button
-            key={tab}
-            className={`transport-bar__tab ${transportTab === tab ? 'active' : ''}`}
-            onClick={() => dispatch({ type: 'SET_TRANSPORT_TAB', payload: tab })}
-          >
-            {tab.toUpperCase()}
+          <button key={tab} style={S.tab(transportTab === tab)}
+            onClick={() => dispatch({ type: 'SET_TRANSPORT_TAB', payload: tab })}>
+            {tab === 'video' ? '▶ VIDEO' : '♪ AUDIO'}
           </button>
         ))}
       </div>
 
-      {/* Media name */}
-      {mediaName && (
-        <div className="transport-bar__name" title={mediaName}>
-          {mediaName}
-        </div>
-      )}
+      {mediaName && <div style={S.name} title={mediaName}>{mediaName}</div>}
 
-      {/* Progress slider */}
-      <div className="transport-bar__progress">
-        <span className="transport-bar__time">{formatTime(time)}</span>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          value={progress}
-          onChange={handleSeek}
-          className="transport-bar__scrubber"
-          onInput={handleSeek}
+      <div style={S.progressRow}>
+        <span style={S.time}>{formatTime(time)}</span>
+        <input type="range" min="0" max="100" value={progress}
+          onChange={handleSeek} onInput={handleSeek}
+          style={{ flex: 1, accentColor: '#D4AF37', cursor: 'pointer' }}
         />
-        <span className="transport-bar__time">{formatTime(dur)}</span>
+        <span style={S.time}>{formatTime(dur)}</span>
       </div>
 
-      {/* Controls */}
-      <div className="transport-bar__controls">
-        <button className="transport-bar__btn" onClick={() => skipTime(-15)} title="Back 15s">
+      <div style={S.controlsRow}>
+        <button style={S.btn} onClick={() => skipTime(-15)} title="Back 15s"
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}>
           <Rewind15Icon />
         </button>
-
-        <button
-          className={`transport-bar__play ${playing ? 'transport-bar__play--playing' : ''}`}
-          onClick={togglePlay}
-          title={playing ? 'Pause' : 'Play'}
-        >
+        <button style={S.playBtn(playing)} onClick={togglePlay} title={playing ? 'Pause' : 'Play'}>
           {playing ? <PauseIcon /> : <PlayIcon />}
         </button>
-
-        <button className="transport-bar__btn" onClick={() => skipTime(15)} title="Forward 15s">
+        <button style={S.btn} onClick={() => skipTime(15)} title="Forward 15s"
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}>
           <Forward15Icon />
         </button>
-
-        {/* Volume knob */}
-        <div className="transport-bar__volume">
+        <div style={S.volRow}>
           <VolumeIcon />
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={volume}
-            onChange={e => dispatch({ type: 'SET_VOLUME', payload: parseFloat(e.target.value) })}
-            className="transport-bar__vol-slider"
+          <input type="range" min="0" max="1" step="0.01" value={volume}
+            onChange={e => {
+              const vol = parseFloat(e.target.value);
+              dispatch({ type: 'SET_VOLUME', payload: vol });
+              // Apply immediately to elements — don't wait for React re-render
+              if (audioRef?.current) audioRef.current.volume = vol;
+              if (videoRef?.current) videoRef.current.volume = vol;
+            }}
+            style={{ flex: 1, accentColor: '#D4AF37', cursor: 'pointer' }}
           />
         </div>
       </div>
@@ -638,6 +771,7 @@ function AudioBinsPanel({ state, dispatch, onImportAudio, audioRef }) {
     if (audioRef?.current) {
       const el = audioRef.current;
       el.src = track.src;
+      el.volume = state.volume ?? 1;
       el.load();
       el.play().catch(() => {});
     }
@@ -771,25 +905,37 @@ function AbTrackIcon({ active }) {
 // ─────────────────────────────────────────────────────────────────
 function ShowControlsToolbar({ activeTab, onTabChange }) {
   const tabs = [
-    { id: 'music',   Icon: MusicIcon,   label: 'Music'   },
-    { id: 'screens', Icon: StageIcon,   label: 'Stage'   },
-    { id: 'stage',   Icon: MessageIcon, label: 'Controls'},
-    { id: 'messages',Icon: MessageIcon, label: 'Messages'},
-    { id: 'macros',  Icon: MacroIcon,   label: 'Macros'  },
+    { id: 'music',    Icon: MusicIcon,   label: 'Music'    },
+    { id: 'screens',  Icon: StageIcon,   label: 'Stage'    },
+    { id: 'stage',    Icon: MessageIcon, label: 'Controls' },
+    { id: 'messages', Icon: MessageIcon, label: 'Messages' },
+    { id: 'macros',   Icon: MacroIcon,   label: 'Macros'   },
   ];
 
   return (
-    <div className="show-controls-toolbar">
-      {tabs.map(({ id, Icon, label }) => (
-        <button
-          key={id}
-          className={`show-controls-toolbar__btn ${activeTab === id ? 'active' : ''}`}
-          onClick={() => onTabChange(id)}
-          title={label}
-        >
-          <Icon color={activeTab === id ? '#D4AF37' : '#555'} />
-        </button>
-      ))}
+    <div style={{
+      display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.05)',
+      background: '#0a0a0d', flexShrink: 0, padding: '0 4px',
+    }}>
+      {tabs.map(({ id, Icon, label }) => {
+        const active = activeTab === id;
+        return (
+          <button key={id} onClick={() => onTabChange(id)} title={label}
+            style={{
+              flex: 1, height: 38, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 3,
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              borderBottom: `2px solid ${active ? '#D4AF37' : 'transparent'}`,
+              transition: 'all 0.15s', paddingBottom: 0,
+            }}
+          >
+            <Icon color={active ? '#D4AF37' : 'rgba(255,255,255,0.2)'} />
+            <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: 0.5, color: active ? '#D4AF37' : 'rgba(255,255,255,0.2)', transition: 'color 0.15s' }}>
+              {label.toUpperCase()}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -844,7 +990,7 @@ export default function RightPanel({
   return (
     <aside className="right-panel">
       {/* 1. Preview — resizable */}
-      <div style={{ height: previewH, flexShrink: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ height: previewH, flexShrink: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#070709' }}>
         <AudiencePreview
           state={state} dispatch={dispatch}
           selectedSlide={selectedSlide} nextSlide={nextSlide}
@@ -885,7 +1031,7 @@ export default function RightPanel({
         videoRef={videoRef} audioRef={audioRef}
       />
 
-      {/* 5. Show Controls Toolbar */}
+      {/* 4. Tab bar */}
       <ShowControlsToolbar
         activeTab={activeControlTab}
         onTabChange={tab => dispatch({ type: 'SET_CONTROL_TAB', payload: tab })}
@@ -894,7 +1040,7 @@ export default function RightPanel({
       {/* Resizer 2 */}
       <div className="rp-resizer" onMouseDown={startResizeContent} title="Drag to resize" />
 
-      {/* 6. Content panel — resizable */}
+      {/* 5. Content panel — resizable */}
       <div style={{ height: contentH, flexShrink: 0, overflow: 'hidden' }} className="right-panel__content">
         {activeControlTab === 'music' && (
           <AudioBinsPanel state={state} dispatch={dispatch} onImportAudio={onImportAudio} audioRef={audioRef} />
@@ -905,10 +1051,14 @@ export default function RightPanel({
         {activeControlTab === 'stage' && (
           <StageControlsPanel state={state} dispatch={dispatch} />
         )}
-        {activeControlTab !== 'music' && activeControlTab !== 'stage' && (
-          <div className="right-panel__placeholder">
-            <span>{activeControlTab.toUpperCase()} CONTROLS</span>
-            <p>Coming soon</p>
+        {activeControlTab !== 'music' && activeControlTab !== 'stage' && activeControlTab !== 'screens' && (
+          <div style={{
+            height: '100%', display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', gap: 8,
+            color: 'rgba(255,255,255,0.08)',
+          }}>
+            <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 2 }}>{activeControlTab.toUpperCase()}</span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.05)' }}>Coming soon</span>
           </div>
         )}
       </div>

@@ -4,7 +4,7 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import TimelinePanel from '../Timeline/TimelinePanel';
-import { registerDropZone, unregisterDropZone, isDragging } from '../../utils/dragSystem';
+import { registerDropZone, unregisterDropZone, isDragging, startDrag } from '../../utils/dragSystem';
 
 // ── Lasso selection ────────────────────────────────────────────
 function useLasso(gridRef, dispatch, slides) {
@@ -82,8 +82,8 @@ function useLasso(gridRef, dispatch, slides) {
 }
 
 function SlideThumbnail({
-  slide, index, isSelected, isDragOver,
-  onClick, onContextMenu,
+  slide, index, isSelected, isDragOver, isReorderTarget, isReorderSource,
+  onClick, onContextMenu, onMouseDown,
   onDrop, hotkey,
 }) {
   const ref     = useRef(null);
@@ -110,20 +110,37 @@ function SlideThumbnail({
   return (
     <div
       ref={ref}
-      className={`slide-card ${isSelected ? 'slide-card--active' : ''} ${isDragOver ? 'slide-card--drag-over' : ''}`}
+      className={`slide-card ${isSelected ? 'slide-card--active' : ''} ${isDragOver ? 'slide-card--drag-over' : ''} ${isReorderTarget ? 'slide-card--reorder-target' : ''}`}
       onClick={onClick}
       onContextMenu={onContextMenu}
-      style={{ '--border-color': borderColor, '--shadow': shadow }}
+      onMouseDown={onMouseDown}
+      style={{
+        '--border-color': isReorderTarget ? '#60a5fa' : borderColor,
+        '--shadow': shadow,
+        cursor: 'grab',
+        opacity:   isReorderSource ? 0.4 : 1,
+        transform: isReorderTarget ? 'translateX(8px) scale(0.96)' : 'none',
+        transition: 'transform 0.15s ease, opacity 0.15s ease',
+        outline:    isReorderTarget ? '2px solid #60a5fa' : undefined,
+        outlineOffset: isReorderTarget ? '3px' : undefined,
+      }}
       aria-selected={isSelected}
       role="option"
       data-slide-id={slide.id}
     >
       <div className="slide-card__thumb">
         {slide.video && (() => {
-          const src = slide.video.startsWith('asset://') || slide.video.startsWith('http') || slide.video.startsWith('blob:')
+          const isData  = slide.video.startsWith('data:');
+          const isImage = isData
+            ? slide.video.startsWith('data:image')
+            : slide.video.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/i);
+          const src = isData || slide.video.startsWith('asset://') || slide.video.startsWith('http') || slide.video.startsWith('blob:')
             ? slide.video
             : convertFileSrc(slide.video);
-          // No autoPlay — just show first frame as thumbnail
+          if (isImage) {
+            return <img src={src} className="slide-card__bg-video" alt=""
+              style={{ objectFit: slide.videoFit || 'cover' }} />;
+          }
           return <video key={slide.video} src={src + '#t=0.001'}
             className="slide-card__bg-video" muted playsInline preload="metadata" />;
         })()}
@@ -376,10 +393,73 @@ export default function SlideGrid({
   onDragOver, onDropMedia,
   onAssignTrigger, onRemoveVideo,
   onDragHoverSlide, onSetHotkey,
+  onReorderSlide,
   audioFiles, audioPlaylists,
 }) {
   const { selectedSlideId, selectedSlideIds = [], contextMenu, showArrangements, activeArrangement, showTimeline } = state;
-  const [dragOverSlideId, setDragOverSlideId] = useState(null);
+  const [dragOverSlideId,   setDragOverSlideId]   = useState(null);
+  const [reorderTarget,     setReorderTarget]      = useState(null); // slideId being dragged over for reorder
+  const reorderDragId    = React.useRef(null);
+  const reorderTargetRef = React.useRef(null); // sync ref so onUp can read without stale closure
+
+  const handleSlideMouseDown = React.useCallback((slide) => (e) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+
+    const startX = e.clientX, startY = e.clientY;
+    let dragging = false;
+
+    const onMove = (mv) => {
+      if (!dragging) {
+        if (Math.abs(mv.clientX - startX) < 5 && Math.abs(mv.clientY - startY) < 5) return;
+        dragging = true;
+        reorderDragId.current    = slide.id;
+        reorderTargetRef.current = null;
+        startDrag('slide-reorder', { slideId: slide.id },
+          `↕  ${slide.text?.slice(0, 22) || 'Slide'}`);
+      }
+      if (!dragging) return;
+
+      // Find which card is under cursor
+      const cards = document.querySelectorAll('.slide-card[data-slide-id]');
+      let target = null;
+      cards.forEach(card => {
+        const r = card.getBoundingClientRect();
+        if (mv.clientX >= r.left && mv.clientX <= r.right &&
+            mv.clientY >= r.top  && mv.clientY <= r.bottom) {
+          target = card.dataset.slideId;
+        }
+      });
+      const validTarget = target && target !== slide.id ? target : null;
+      reorderTargetRef.current = validTarget;   // always sync
+      setReorderTarget(validTarget);            // drives CSS
+    };
+
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+
+      if (dragging && reorderDragId.current) {
+        const from = reorderDragId.current;
+        const to   = reorderTargetRef.current;   // read sync ref — never stale
+        if (to && to !== from) {
+          onReorderSlide?.(from, to);
+        }
+        // Clean up ghost
+        const ghost = document.getElementById('ef-drag-ghost');
+        if (ghost) ghost.remove();
+      }
+
+      reorderDragId.current    = null;
+      reorderTargetRef.current = null;
+      setReorderTarget(null);
+      dragging = false;
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [onReorderSlide]);
+
   const gridRef = React.useRef(null);
   const lassoStart = useLasso(gridRef, dispatch, slides);
 
@@ -432,8 +512,11 @@ export default function SlideGrid({
               slide={slide} index={i}
               isSelected={slide.id === selectedSlideId || selectedSlideIds.includes(slide.id)}
               isDragOver={dragOverSlideId === slide.id}
+              isReorderTarget={reorderTarget === slide.id}
+              isReorderSource={reorderDragId.current === slide.id}
               hotkey={Object.entries(state.hotkeys || {}).find(([,id]) => id === slide.id)?.[0]}
               onClick={() => onSlideClick(slide)}
+              onMouseDown={handleSlideMouseDown(slide)}
               onContextMenu={e => { e.preventDefault(); dispatch({ type:'SET_CONTEXT_MENU', payload:{ x:e.clientX, y:e.clientY, slideId:slide.id } }); }}
               onDrop={(data, slideId) => {
                 const url = data?.src || data?.path;

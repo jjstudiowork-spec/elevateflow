@@ -125,7 +125,7 @@ function EditCanvas({
   const videoSrc = selectedSlide.video
     ? (selectedSlide.video.startsWith('asset://') || selectedSlide.video.startsWith('http')
         ? selectedSlide.video
-        : convertFileSrc(selectedSlide.video))
+        : selectedSlide.video.startsWith('data:') ? selectedSlide.video : convertFileSrc(selectedSlide.video))
     : null;
 
   return (
@@ -138,7 +138,8 @@ function EditCanvas({
 
       <div className="edit-canvas__surface" style={{ aspectRatio: canvasRatio, containerType: 'inline-size' }}>
         {videoSrc && (
-          <video src={videoSrc} className="edit-canvas__bg-video" autoPlay muted loop playsInline />
+          <video src={videoSrc} className="edit-canvas__bg-video" autoPlay muted loop playsInline
+            style={{ objectFit: selectedSlide.videoFit || 'cover' }} />
         )}
 
         <div
@@ -193,7 +194,7 @@ function EditCanvas({
 }
 
 // ── Shape Inspector ────────────────────────────────────────────
-function ShapeInspector({ slide }) {
+function ShapeInspector({ slide, updateStyle }) {
   if (!slide) return <div className="inspector__empty">No slide selected</div>;
   return (
     <div className="inspector-group">
@@ -204,6 +205,34 @@ function ShapeInspector({ slide }) {
         <PropBox label="W" value={Math.round(slide.width ?? 60)} />
         <PropBox label="H" value={Math.round(slide.height ?? 30)} />
       </div>
+      {slide.video && updateStyle && (
+        <div style={{ marginTop: 12 }}>
+          <div className="inspector-group__label">VIDEO FIT</div>
+          <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+            {[
+              { label: 'Fill',    value: 'cover',   title: 'Fill — crop to fill screen' },
+              { label: 'Fit',     value: 'contain', title: 'Fit — letterbox/pillarbox' },
+              { label: 'Stretch', value: 'fill',    title: 'Stretch — ignore aspect ratio' },
+            ].map(({ label, value, title }) => {
+              const active = (slide.videoFit || 'cover') === value;
+              return (
+                <button key={value} title={title}
+                  onClick={() => updateStyle('videoFit', value)}
+                  style={{
+                    flex: 1, height: 28, borderRadius: 6, cursor: 'pointer',
+                    border: `1px solid ${active ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                    background: active ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.04)',
+                    color: active ? '#D4AF37' : 'rgba(255,255,255,0.4)',
+                    fontSize: 10, fontWeight: 700,
+                    transition: 'all 0.12s',
+                  }}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -425,7 +454,7 @@ function Inspector({ activeTab, slide, dispatch, updateStyle, onCopyStyle, onPas
         ))}
       </div>
       <div className="inspector__body">
-        {activeTab === 'Shape' && <ShapeInspector slide={slide} />}
+        {activeTab === 'Shape' && <ShapeInspector slide={slide} updateStyle={updateStyle} />}
         {activeTab === 'Text' && (
           <TextInspector
             slide={slide}
@@ -640,21 +669,29 @@ export default function EditMode({
 
 // ── Canvas Ratio Bar ───────────────────────────────────────────
 function CanvasRatioBar({ canvasRatio, dispatch }) {
-  const [monitors, setMonitors] = React.useState([]);
+  const [screens, setScreens] = React.useState([]);
 
   React.useEffect(() => {
-    const load = async () => {
+    const load = () => {
       try {
-        const { availableMonitors } = await import('@tauri-apps/api/window');
-        const list = await availableMonitors();
-        if (list?.length) setMonitors(list);
+        const saved = JSON.parse(localStorage.getItem('ef_screen_assignments') || '{}');
+        const all = [
+          ...(saved.audienceScreens || []).map(s => ({ ...s, role: 'audience' })),
+          ...(saved.stageScreens    || []).map(s => ({ ...s, role: 'stage'    })),
+        ];
+        if (all.length > 0) setScreens(all);
       } catch {}
     };
     load();
+    window.addEventListener('ef-screens-updated', load);
+    window.addEventListener('storage', load);
+    return () => {
+      window.removeEventListener('ef-screens-updated', load);
+      window.removeEventListener('storage', load);
+    };
   }, []);
 
   const setRatio = (ratio) => dispatch({ type: 'SET_CANVAS_RATIO', payload: ratio });
-
   const PRESETS = [
     { label: '16:9', ratio: '16 / 9' },
     { label: '4:3',  ratio: '4 / 3' },
@@ -667,45 +704,29 @@ function CanvasRatioBar({ canvasRatio, dispatch }) {
       <span className="canvas-ratio-bar__label">CANVAS</span>
       <div className="canvas-ratio-bar__presets">
         {PRESETS.map(p => (
-          <button
-            key={p.ratio}
+          <button key={p.ratio}
             className={`canvas-ratio-bar__btn ${canvasRatio === p.ratio ? 'canvas-ratio-bar__btn--active' : ''}`}
-            onClick={() => setRatio(p.ratio)}
-          >
+            onClick={() => setRatio(p.ratio)}>
             {p.label}
           </button>
         ))}
       </div>
-      {monitors.length > 0 && (
+      {screens.length > 0 && (
         <>
           <div className="canvas-ratio-bar__divider" />
-          <select
-            className="canvas-ratio-bar__select"
-            value=""
-            onChange={e => {
-              if (e.target.value) setRatio(e.target.value);
-            }}
-          >
-            <option value="">Display…</option>
-            {monitors.map((m, i) => {
-              const sf = m.scaleFactor ?? 1;
-              const w  = Math.round((m.size?.width  || 1920) / sf);
-              const h  = Math.round((m.size?.height || 1080) / sf);
-              const name = m.name && !m.name.includes('\\\\') && !m.name.includes('/dev/')
-                ? m.name
-                : `Display ${i + 1}`;
-              return (
-                <option key={i} value={`${w} / ${h}`}>
-                  {name} ({w}×{h})
-                </option>
-              );
+          <select className="canvas-ratio-bar__select" value=""
+            onChange={e => { if (e.target.value) setRatio(e.target.value); }}>
+            <option value="">Screen…</option>
+            {screens.map((s, i) => {
+              const w = s.width || 1920, h = s.height || 1080;
+              const name = s.name || (s.role === 'audience' ? 'Audience' : 'Stage');
+              const tag  = s.isNdi ? ' NDI' : s.isPlaceholder ? ' (P)' : '';
+              return <option key={s.id || i} value={`${w} / ${h}`}>{name}{tag} {w}×{h}</option>;
             })}
           </select>
         </>
       )}
-      <span className="canvas-ratio-bar__current">
-        {canvasRatio.replace(' / ', ':')}
-      </span>
+      <span className="canvas-ratio-bar__current">{canvasRatio.replace(' / ', ':')}</span>
     </div>
   );
 }
