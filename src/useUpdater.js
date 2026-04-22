@@ -5,7 +5,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 
-const CURRENT_VER = '0.3.0'; // bumped by release.cjs
+const CURRENT_VER = '0.3.1'; // bumped by release.cjs
 
 function isNewer(remote, current) {
   const parse = v => v.replace(/[^0-9.]/g, '').split('.').map(Number);
