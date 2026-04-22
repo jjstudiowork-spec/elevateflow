@@ -655,18 +655,37 @@ input[type=range]::-webkit-slider-thumb {
   width: var(--slide-card-size, 180px);
   cursor: pointer;
   border-radius: var(--radius-lg);
-  overflow: hidden;
-  /* Use the group colour as the border — gives instant visual grouping without blocking anything */
+  overflow: visible; /* footer sits in normal flow below thumb */
+  display: flex;
+  flex-direction: column;
   border: 2px solid var(--border-color, var(--border-dim));
   box-shadow: var(--shadow, var(--shadow-sm));
   background: var(--bg-void);
   container-type: inline-size;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  /* ALL animated properties listed here — never override in inline style */
+  transition:
+    border-color 0.18s ease,
+    box-shadow   0.18s ease,
+    opacity      0.15s ease,
+    transform    0.15s ease;
+}
+
+/* Hover — subtle lift */
+.slide-card:hover:not(.slide-card--active) {
+  border-color: rgba(255,255,255,0.18) !important;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.55) !important;
+  transform: translateY(-2px);
 }
 
 .slide-card--active {
   border-color: var(--gold-500) !important;
   box-shadow: 0 0 0 1px var(--gold-500), 0 10px 30px rgba(0,0,0,0.7) !important;
+}
+
+/* Reorder drop target */
+.slide-card--reorder-target:not(.slide-card--active) {
+  border-color: #60a5fa !important;
+  box-shadow: 0 0 0 2px #60a5fa, 0 0 20px rgba(96,165,250,0.25) !important;
 }
 
 /* Group bar REMOVED — group colour is now the card border only */
@@ -677,6 +696,7 @@ input[type=range]::-webkit-slider-thumb {
   aspect-ratio: var(--slide-ratio, 16 / 9);
   background: var(--bg-void);
   overflow: hidden;
+  /* Footer sits OUTSIDE the thumb — text never hidden under it */
 }
 
 .slide-card__bg-video {
@@ -701,16 +721,16 @@ input[type=range]::-webkit-slider-thumb {
 }
 
 .slide-card__footer {
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
+  /* Normal flow — sits BELOW the thumb, never overlaps it */
+  position: relative;
   height: 22px;
-  background: rgba(0, 0, 0, 0.72);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
   padding: 0 6px;
   gap: 5px;
-  border-top: 1px solid rgba(255,255,255,0.05);
+  border-top: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
 }
 
 .slide-card__index {
@@ -1743,15 +1763,6 @@ input[type=range]::-webkit-slider-thumb {
   background: #1e1e1e;
 }
 
-/* ── Slide reorder target indicator ─────────────────────────── */
-.slide-card--reorder-target {
-  outline: 2px solid #60a5fa !important;
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(96,165,250,0.2) !important;
-  transform: scale(0.97);
-  transition: transform 0.1s, outline 0.1s;
-}
-
 /* ── Lasso selection ─────────────────────────────────────────── */
 .slide-card--lasso {
   outline: 2px solid rgba(59,130,246,0.7) !important;
@@ -1792,4 +1803,38 @@ input[type=range]::-webkit-slider-thumb {
 }
 .sidebar__section-divider:hover span {
   color: #666;
+}
+/* ── Hotkey badge on slide card ── */
+.slide-card__hotkey-badge {
+  position: absolute;
+  top: 5px; left: 5px;
+  z-index: 10;
+  background: rgba(212,175,55,0.92);
+  color: #000;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  width: 18px; height: 18px;
+  border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+  pointer-events: none;
+}
+
+/* ── Slide insert indicator (drag reorder) ── */
+.slide-insert-indicator {
+  position: relative;
+  width: 4px;
+  align-self: stretch;
+  border-radius: 2px;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.slide-insert-indicator::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  background: #60a5fa;
+  box-shadow: 0 0 12px rgba(96,165,250,0.8);
 }

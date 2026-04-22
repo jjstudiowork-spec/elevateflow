@@ -202,7 +202,8 @@ function reducer(state, action) {
     case 'SET_MEDIA_FILES': return { ...state, mediaFiles: action.payload };
     case 'ADD_MEDIA_FILES': return { ...state, mediaFiles: [...state.mediaFiles, ...action.payload] };
     case 'ADD_MEDIA_FILE':  return { ...state, mediaFiles: [...state.mediaFiles, action.payload] };
-    case 'DELETE_MEDIA_FILE': return { ...state, mediaFiles: state.mediaFiles.filter(f => f.id !== action.payload) };
+    case 'DELETE_MEDIA_FILE':   return { ...state, mediaFiles: state.mediaFiles.filter(f => f.id !== action.payload) };
+    case 'CLEAR_ALL_MEDIA':     return { ...state, mediaFiles: [] };
     case 'UPDATE_MEDIA_FILE': return { ...state, mediaFiles: state.mediaFiles.map(f => f.id === action.payload.id ? { ...f, ...action.payload } : f) };
     case 'UPDATE_AUDIO_FILE': return { ...state, audioFiles: state.audioFiles.map(f => f.id === action.payload.id ? { ...f, ...action.payload } : f) };
     case 'SET_AUDIO_FILES': return { ...state, audioFiles: action.payload };
@@ -397,11 +398,13 @@ function reducer(state, action) {
       const { key, slideId } = action.payload;
       const next = { ...state.hotkeys };
       if (slideId === null) {
-        // Remove any existing binding for this slide
-        Object.keys(next).forEach(k => { if (next[k] === slideId) delete next[k]; });
+        // Clear: remove any key that points to the key being cleared
+        if (key) delete next[key.toLowerCase()];
       } else {
-        // Remove old binding for this key if any
+        // Remove any previous key assigned to this slide
         Object.keys(next).forEach(k => { if (next[k] === slideId) delete next[k]; });
+        // Remove any slide previously on this key
+        if (next[key.toLowerCase()] && next[key.toLowerCase()] !== slideId) delete next[key.toLowerCase()];
         next[key.toLowerCase()] = slideId;
       }
       return { ...state, hotkeys: next };

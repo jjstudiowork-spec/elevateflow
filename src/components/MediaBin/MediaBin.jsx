@@ -329,6 +329,24 @@ export default function MediaBin({ state, dispatch, onMediaClick, onImportMedia,
             </svg>
           </button>
 
+          {/* Delete All */}
+          {state.mediaFiles?.length > 0 && (
+            <button
+              className="mb-bar__btn"
+              title="Delete all media"
+              onClick={() => {
+                if (window.confirm(`Remove all ${state.mediaFiles.length} media files from the bin? This does not delete files from disk.`)) {
+                  dispatch({ type: 'CLEAR_ALL_MEDIA' });
+                }
+              }}
+              style={{ color: '#f87171' }}
+            >
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+              </svg>
+            </button>
+          )}
+
           <div className="mb-bar__divider" />
 
           {/* Fade toggle button — purple when active */}

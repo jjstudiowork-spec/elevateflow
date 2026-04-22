@@ -15,13 +15,18 @@ export function useSlides(state, dispatch) {
     dispatch({ type: 'UPDATE_SONG_SLIDES', payload: newSlides });
   }, [dispatch]);
 
-  const reorderSlide = useCallback((dragId, targetId) => {
+  const reorderSlide = useCallback((dragId, insertBefore) => {
     const from = slides.findIndex(s => s.id === dragId);
-    const to   = slides.findIndex(s => s.id === targetId);
-    if (from === -1 || to === -1 || from === to) return;
+    if (from === -1) return;
     const next = [...slides];
     const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
+    if (insertBefore === '__END__') {
+      next.push(moved);
+    } else {
+      const to = next.findIndex(s => s.id === insertBefore);
+      if (to === -1) { next.push(moved); }
+      else { next.splice(to, 0, moved); }
+    }
     dispatch({ type: 'UPDATE_SONG_SLIDES', payload: next });
   }, [slides, dispatch]);
 

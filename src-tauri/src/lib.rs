@@ -180,6 +180,11 @@ fn set_app_menu_visible(app: tauri::AppHandle, visible: bool) {
 }
 
 #[tauri::command]
+fn app_exit(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
+#[tauri::command]
 fn get_monitors(app: tauri::AppHandle) -> Vec<serde_json::Value> {
     let mut result = Vec::new();
     if let Some(win) = app.get_webview_window("main") {
@@ -227,6 +232,53 @@ fn get_monitors(app: tauri::AppHandle) -> Vec<serde_json::Value> {
     result
 }
 
+#[tauri::command]
+async fn start_ltc_server(app: tauri::AppHandle) -> Result<String, String> {
+    use warp::Filter;
+    use futures_util::{StreamExt, SinkExt};
+    let port: u16 = 47824;
+    let (tx, _rx) = broadcast::channel::<String>(64);
+    { *LTC_TX.lock().unwrap() = Some(tx.clone()); }
+    let app2 = app.clone();
+    let tx_filter = warp::any().map(move || (tx.clone(), app2.clone()));
+    let ws_route = warp::path("ef-ltc")
+        .and(warp::ws())
+        .and(tx_filter)
+        .map(|ws: warp::ws::Ws, (tx, app): (broadcast::Sender<String>, tauri::AppHandle)| {
+            ws.on_upgrade(move |websocket| async move {
+                let addr = "client".to_string();
+                let _ = app.emit("ltc-client-connected", serde_json::json!({ "addr": addr }));
+                let mut rx = tx.subscribe();
+                let (mut ws_tx, _ws_rx) = websocket.split();
+                while let Ok(msg) = rx.recv().await {
+                    if ws_tx.send(warp::ws::Message::text(msg)).await.is_err() { break; }
+                }
+                let _ = app.emit("ltc-client-disconnected", serde_json::json!({ "addr": addr }));
+            })
+        });
+    tokio::spawn(async move {
+        warp::serve(ws_route).run(([0, 0, 0, 0], port)).await;
+    });
+    Ok(format!("LTC server on :{}", port))
+}
+
+#[tauri::command]
+fn broadcast_ltc(timecode: String, fps: f64) -> Result<(), String> {
+    let lock = LTC_TX.lock().unwrap();
+    if let Some(tx) = lock.as_ref() {
+        let payload = serde_json::json!({
+            "timecode": timecode,
+            "fps": fps,
+            "ts": std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64,
+        }).to_string();
+        let _ = tx.send(payload);
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -255,6 +307,9 @@ pub fn run() {
             get_monitors,
             set_app_menu_visible,
             rebuild_full_menu,
+            start_ltc_server,
+            broadcast_ltc,
+            app_exit,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -263,23 +318,9 @@ pub fn run() {
                 if label == "main" {
                     api.prevent_close();
                     let app = window.app_handle().clone();
-                    if let Some(w) = app.get_webview_window("close-confirm") {
-                        let _ = w.show();
-                        let _ = w.set_focus();
-                    } else {
-                        let _ = tauri::WebviewWindowBuilder::new(
-                            &app,
-                            "close-confirm",
-                            tauri::WebviewUrl::App("index.html#/close-confirm".into()),
-                        )
-                        .title("Close ElevateFlow")
-                        .inner_size(360.0, 220.0)
-                        .resizable(false)
-                        .center()
-                        .always_on_top(true)
-                        .decorations(false)
-                        .build();
-                    }
+                    // Emit event to frontend — App.jsx will navigate to launcher
+                    // Frontend handles the close flow and calls app_exit when ready
+                    let _ = app.emit("navigate-to-launcher", ());
                 }
             }
         })
@@ -663,8 +704,9 @@ use tokio::sync::broadcast;
 
 // Global broadcast channel for slide payloads
 lazy_static::lazy_static! {
-    static ref PRESENTATION_TX: Mutex<Option<broadcast::Sender<String>>> = Mutex::new(None);
-    static ref PRESENTATION_PORT: Mutex<u16> = Mutex::new(0);
+    static ref PRESENTATION_TX:   Mutex<Option<broadcast::Sender<String>>> = Mutex::new(None);
+    static ref PRESENTATION_PORT: Mutex<u16>                               = Mutex::new(0);
+    static ref LTC_TX:            Mutex<Option<broadcast::Sender<String>>> = Mutex::new(None);
 }
 
 #[tauri::command]

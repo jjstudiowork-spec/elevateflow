@@ -23,6 +23,7 @@ import Toolbar from './components/Toolbar/Toolbar';
 import Sidebar from './components/Sidebar/Sidebar';
 import SlideGrid from './components/SlideGrid/SlideGrid';
 import RightPanel from './components/RightPanel/index';
+import { SlideDragProvider } from './utils/slideDragSystem';
 import MediaBin from './components/MediaBin/MediaBin';
 import EditMode from './components/EditMode/EditMode';
 import TextImport from './TextImport';
@@ -124,7 +125,7 @@ function ResizableLayout({
   selectedSlide, nextSlide, videoRef, audioRef,
   togglePlay, skipTime, formatTime, clearAll,
   handleVideoTimeUpdate, handleAudioTimeUpdate, handleImportMedia,
-  handleMediaClick, onDragStart, onReorderSlide, displayedItems,
+  handleMediaClick, onDragStart, onReorderSlide, onSetHotkey, displayedItems,
   startHosting, joinSession, endSession,
   showMediaBin,
 }) {
@@ -187,18 +188,22 @@ function ResizableLayout({
  
       {/* Center */}
       <div className="show-layout__center">
-        <SlideGrid state={state} dispatch={dispatch}
-          slides={slides} displaySlides={displaySlides} activeSong={activeSong}
-          onSlideClick={handleSlideClick} onAddSlide={() => addSlide()}
-          onDuplicate={duplicateSlide} onCopy={copySlide} onCut={cutSlide}
-          onPaste={pasteSlide} onSetGroup={setSlideGroup} onDelete={deleteSlide}
-          onDragOver={(e) => e.preventDefault()} onDropMedia={onDropMedia}
-          onAssignTrigger={assignTriggerToSlide} onDragHoverSlide={setDragHoverSlideId}
-          onRemoveVideo={(slideId) => {
-            if (slideId) updateSlides(slides.map(s => s.id === slideId ? { ...s, video: null } : s));
-          }}
-          audioFiles={state.audioFiles} audioPlaylists={state.audioPlaylists}
-        />
+        <SlideDragProvider onReorder={onReorderSlide}>
+          <SlideGrid state={state} dispatch={dispatch}
+            slides={slides} displaySlides={displaySlides} activeSong={activeSong}
+            onSlideClick={handleSlideClick} onAddSlide={() => addSlide()}
+            onDuplicate={duplicateSlide} onCopy={copySlide} onCut={cutSlide}
+            onPaste={pasteSlide} onSetGroup={setSlideGroup} onDelete={deleteSlide}
+            onDragOver={(e) => e.preventDefault()} onDropMedia={onDropMedia}
+            onAssignTrigger={assignTriggerToSlide} onDragHoverSlide={setDragHoverSlideId}
+            onRemoveVideo={(slideId) => {
+              if (slideId) updateSlides(slides.map(s => s.id === slideId ? { ...s, video: null } : s));
+            }}
+            onReorderSlide={onReorderSlide}
+            onSetHotkey={onSetHotkey}
+            audioFiles={state.audioFiles} audioPlaylists={state.audioPlaylists}
+          />
+        </SlideDragProvider>
       </div>
  
       {/* Center ↔ Right resizer */}
@@ -290,6 +295,8 @@ export default function App() {
   useEffect(() => {
     invoke('set_app_menu_visible', { visible: true }).catch(() => {});
   }, []);
+
+  // navigate-to-launcher handled globally in main.jsx NavigationListener
 
   // Restore saved audio output device on startup + listen for changes
   useEffect(() => {

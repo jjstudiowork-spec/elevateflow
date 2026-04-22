@@ -1,93 +1,123 @@
 /**
- * SlideGrid.jsx — with trigger menu, music icon, drag highlight, timeline
+ * SlideGrid.jsx — ElevateFlow slide grid
+ * - Drag-to-reorder with ProPresenter-style colored insert bar
+ * - Hotkey dialog (A–Z input, shows badge top-left of slide)
+ * - Footer below thumb so text never overlaps it
  */
-import React, { useCallback, useState, useEffect, useRef } from 'react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import TimelinePanel from '../Timeline/TimelinePanel';
-import { registerDropZone, unregisterDropZone, isDragging, startDrag } from '../../utils/dragSystem';
+import { registerDropZone, unregisterDropZone, isDragging } from '../../utils/dragSystem';
+import { SlideDragProvider, useSlideDrag } from '../../utils/slideDragSystem';
 
-// ── Lasso selection ────────────────────────────────────────────
-function useLasso(gridRef, dispatch, slides) {
-  const lasso = React.useRef(null);
-  const box   = React.useRef(null);
+// ── Hotkey Dialog ──────────────────────────────────────────────
+function HotkeyDialog({ slideId, currentKey, onConfirm, onClear, onCancel }) {
+  const [value, setValue] = useState(currentKey || '');
+  const inputRef = useRef(null);
 
-  const start = React.useCallback((e) => {
-    // Only start on left-click on the grid background (not on a card)
-    if (e.button !== 0) return;
-    if (e.target.closest('.slide-card') || e.target.closest('.pres-header')) return;
-    if (isDragging()) return;
+  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 50); }, []);
 
-    const grid = gridRef.current;
-    if (!grid) return;
-    e.preventDefault();
+  const handleKey = (e) => {
+    const k = e.key.toUpperCase();
+    if (/^[A-Z]$/.test(k)) { setValue(k); e.preventDefault(); }
+    else if (e.key === 'Backspace') setValue('');
+    else if (e.key === 'Enter' && value) onConfirm(value.toLowerCase());
+    else if (e.key === 'Escape') onCancel();
+  };
 
-    const r = grid.getBoundingClientRect();
-    const sx = e.clientX; const sy = e.clientY;
+  return ReactDOM.createPortal(
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 100000,
+      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }} onMouseDown={onCancel}>
+      <div onMouseDown={e => e.stopPropagation()} style={{
+        background: '#1a1a1e', border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 14, padding: '24px 28px', width: 300,
+        boxShadow: '0 24px 60px rgba(0,0,0,0.8)',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", Arial, sans-serif',
+      }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#e4e4e7', marginBottom: 6 }}>
+          Assign Hot Key
+        </div>
+        <div style={{ fontSize: 11, color: '#52525b', marginBottom: 20 }}>
+          Press a letter key (A–Z) to assign it as a hotkey for this slide.
+        </div>
 
-    // Create lasso element
-    const el = document.createElement('div');
-    el.id = 'ef-lasso';
-    Object.assign(el.style, {
-      position: 'fixed', border: '1px solid rgba(59,130,246,0.8)',
-      background: 'rgba(59,130,246,0.12)', borderRadius: '2px',
-      pointerEvents: 'none', zIndex: 9998,
-      left: sx + 'px', top: sy + 'px', width: '0', height: '0',
-    });
-    document.body.appendChild(el);
-    box.current = { sx, sy, el };
+        {/* Key display */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+          <div
+            ref={inputRef}
+            tabIndex={0}
+            onKeyDown={handleKey}
+            style={{
+              width: 52, height: 52, borderRadius: 10,
+              border: '2px solid rgba(212,175,55,0.5)',
+              background: value ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.04)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 26, fontWeight: 900,
+              color: value ? '#D4AF37' : 'rgba(255,255,255,0.15)',
+              outline: 'none', cursor: 'text',
+              boxShadow: value ? '0 0 0 3px rgba(212,175,55,0.15)' : 'none',
+              transition: 'all 0.15s',
+              userSelect: 'none',
+            }}
+          >
+            {value || '?'}
+          </div>
+          <div style={{ fontSize: 11, color: '#52525b', lineHeight: 1.5 }}>
+            {value ? `Key "${value}" will trigger this slide` : 'Press any letter key'}
+          </div>
+        </div>
 
-    // Clear existing selection
-    dispatch({ type: 'SET_SELECTED_SLIDE_IDS', payload: [] });
+        <div style={{ fontSize: 10, color: '#3f3f46', marginBottom: 18 }}>
+          Valid characters: A–Z
+        </div>
 
-    const onMove = (ev) => {
-      const { sx, sy, el } = box.current;
-      const x = Math.min(ev.clientX, sx);
-      const y = Math.min(ev.clientY, sy);
-      const w = Math.abs(ev.clientX - sx);
-      const h = Math.abs(ev.clientY - sy);
-      el.style.left = x + 'px'; el.style.top = y + 'px';
-      el.style.width = w + 'px'; el.style.height = h + 'px';
-
-      // Hit-test each slide card
-      const lassoRect = { left: x, top: y, right: x + w, bottom: y + h };
-      const selected = [];
-      document.querySelectorAll('[data-slide-id]').forEach(card => {
-        const cr = card.getBoundingClientRect();
-        const overlap = !(cr.right < lassoRect.left || cr.left > lassoRect.right ||
-                          cr.bottom < lassoRect.top || cr.top > lassoRect.bottom);
-        if (overlap) {
-          card.classList.add('slide-card--lasso');
-          selected.push(card.dataset.slideId);
-        } else {
-          card.classList.remove('slide-card--lasso');
-        }
-      });
-      dispatch({ type: 'SET_SELECTED_SLIDE_IDS', payload: selected });
-      if (selected.length === 1) dispatch({ type: 'SET_SELECTED_SLIDE', payload: selected[0] });
-    };
-
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-      document.querySelectorAll('.slide-card--lasso').forEach(c => c.classList.remove('slide-card--lasso'));
-      box.current?.el?.remove();
-      box.current = null;
-    };
-
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, [dispatch, slides]);
-
-  return start;
+        {/* Buttons */}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onCancel} style={dlgBtn('#333', '#888')}>Cancel</button>
+          <button onClick={onClear} style={dlgBtn('rgba(239,68,68,0.12)', '#f87171', 'rgba(239,68,68,0.3)')}>Clear</button>
+          <button onClick={() => value && onConfirm(value.toLowerCase())}
+            disabled={!value}
+            style={dlgBtn(value ? 'rgba(212,175,55,0.12)' : '#111', value ? '#D4AF37' : '#333', value ? 'rgba(212,175,55,0.3)' : '#222')}>
+            OK
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+function dlgBtn(bg, color, border = 'rgba(255,255,255,0.1)') {
+  return {
+    padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+    cursor: 'pointer', border: `1px solid ${border}`,
+    background: bg, color,
+  };
 }
 
+// ── Insert indicator ───────────────────────────────────────────
+function InsertBar({ color = '#60a5fa' }) {
+  return (
+    <div style={{
+      width: 4, alignSelf: 'stretch', borderRadius: 2, flexShrink: 0,
+      background: color,
+      boxShadow: `0 0 14px ${color}, 0 0 4px ${color}`,
+      margin: '0 1px',
+      minHeight: 40,
+    }} />
+  );
+}
+
+// ── Slide thumbnail ────────────────────────────────────────────
 function SlideThumbnail({
-  slide, index, isSelected, isDragOver, isReorderTarget, isReorderSource,
+  slide, index, isSelected, isDragOver, isReorderSource,
+  hotkey,
   onClick, onContextMenu, onMouseDown,
-  onDrop, hotkey,
+  onDrop,
 }) {
-  const ref     = useRef(null);
-  // Keep handler ref stable — avoids re-registering the drop zone every render
+  const ref        = useRef(null);
   const handlerRef = useRef(null);
   handlerRef.current = onDrop;
 
@@ -98,9 +128,12 @@ function SlideThumbnail({
       if (type === 'media' || type === 'media-file') handlerRef.current?.(data, slide.id);
     });
     return () => unregisterDropZone(el);
-  }, [slide.id]); // stable — only re-register if slide.id changes
+  }, [slide.id]);
 
-  const borderColor = isDragOver ? '#00e87a' : isSelected ? '#D4AF37' : (slide.color || '#2a2a2a');
+  const borderColor = isDragOver ? '#00e87a'
+                    : isSelected ? '#D4AF37'
+                    : (slide.color || 'var(--border-dim)');
+
   const shadow = isDragOver
     ? '0 0 0 2px #00e87a, 0 0 16px rgba(0,232,122,0.35)'
     : isSelected
@@ -110,40 +143,41 @@ function SlideThumbnail({
   return (
     <div
       ref={ref}
-      className={`slide-card ${isSelected ? 'slide-card--active' : ''} ${isDragOver ? 'slide-card--drag-over' : ''} ${isReorderTarget ? 'slide-card--reorder-target' : ''}`}
+      className={`slide-card${isSelected ? ' slide-card--active' : ''}${isDragOver ? ' slide-card--drag-over' : ''}`}
       onClick={onClick}
       onContextMenu={onContextMenu}
       onMouseDown={onMouseDown}
       style={{
-        '--border-color': isReorderTarget ? '#60a5fa' : borderColor,
+        '--border-color': borderColor,
         '--shadow': shadow,
-        cursor: 'grab',
-        opacity:   isReorderSource ? 0.4 : 1,
-        transform: isReorderTarget ? 'translateX(8px) scale(0.96)' : 'none',
-        transition: 'transform 0.15s ease, opacity 0.15s ease',
-        outline:    isReorderTarget ? '2px solid #60a5fa' : undefined,
-        outlineOffset: isReorderTarget ? '3px' : undefined,
+        opacity: isReorderSource ? 0.3 : 1,
       }}
       aria-selected={isSelected}
       role="option"
       data-slide-id={slide.id}
     >
+      {/* Thumb — aspect ratio box, content never bleeds into footer */}
       <div className="slide-card__thumb">
         {slide.video && (() => {
           const isData  = slide.video.startsWith('data:');
-          const isImage = isData
-            ? slide.video.startsWith('data:image')
-            : slide.video.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/i);
-          const src = isData || slide.video.startsWith('asset://') || slide.video.startsWith('http') || slide.video.startsWith('blob:')
-            ? slide.video
-            : convertFileSrc(slide.video);
-          if (isImage) {
-            return <img src={src} className="slide-card__bg-video" alt=""
-              style={{ objectFit: slide.videoFit || 'cover' }} />;
+          const isImage = isData ? slide.video.startsWith('data:image')
+                                 : slide.video.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/i);
+          const src = (isData || slide.video.startsWith('asset://') || slide.video.startsWith('http') || slide.video.startsWith('blob:'))
+            ? slide.video : convertFileSrc(slide.video);
+          if (isImage || slide.videoFit === 'contain') {
+            return <img src={src} className="slide-card__bg-video" alt="" style={{ objectFit: slide.videoFit || 'cover' }} />;
           }
-          return <video key={slide.video} src={src + '#t=0.001'}
-            className="slide-card__bg-video" muted playsInline preload="metadata" />;
+          return <video key={slide.video} src={src + '#t=0.001'} className="slide-card__bg-video" muted playsInline preload="metadata" />;
         })()}
+
+        {/* Hotkey badge — top-left corner */}
+        {hotkey && (
+          <div className="slide-card__hotkey-badge">
+            {hotkey.toUpperCase()}
+          </div>
+        )}
+
+        {/* Text */}
         <div className="slide-card__text" style={{
           left: `${slide.x ?? 50}%`, top: `${slide.y ?? 50}%`,
           width: `${slide.width ?? 60}%`, height: `${slide.height ?? 30}%`,
@@ -157,6 +191,8 @@ function SlideThumbnail({
         }}>
           {slide.text}
         </div>
+
+        {/* Media drop overlay */}
         {isDragOver && (
           <div className="slide-card__drop-overlay">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#00e87a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -165,185 +201,21 @@ function SlideThumbnail({
             <span>Drop as background</span>
           </div>
         )}
-        <div className="slide-card__footer">
-          <span className="slide-card__index">{index + 1}</span>
-          {slide.group && slide.group !== 'None' && (
-            <span
-              className="slide-card__group-label"
-              style={{ color: slide.color || '#888', borderColor: slide.color || '#555' }}
-            >
-              {slide.group}
-            </span>
-          )}
-          <div style={{ display:'flex', gap:3, alignItems:'center', marginLeft:'auto' }}>
-            {hotkey && (
-              <span style={{
-                fontSize:8, fontWeight:900, color:'#D4AF37',
-                background:'rgba(212,175,55,0.15)', border:'1px solid rgba(212,175,55,0.3)',
-                borderRadius:3, padding:'1px 4px', letterSpacing:0.5,
-              }}>{hotkey.toUpperCase()}</span>
-            )}
-            {slide.triggerAudio && <MusicNoteIcon color="#D4AF37" size={10} />}
-            {slide.video && <VideoIcon />}
-          </div>
-        </div>
       </div>
-    </div>
-  );
-}
 
-// ── Hotkey Sub-Menu ────────────────────────────────────────────
-const GROUP_HOTKEYS = {
-  'Verse': 'v', 'Chorus': 'c', 'Bridge': 'b', 'Intro': 'i',
-  'Outro': 'o', 'Pre-Chorus': 'p', 'Ending': 'e', 'Tag': 't',
-  'Slide': 's', 'Interlude': 's',
-};
-
-function HotkeySubMenu({ slideId, existingKey, onSetHotkey }) {
-  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-  return (
-    <div className="context-menu context-menu--submenu" style={{ width: 210, padding: 8 }}
-      onMouseEnter={e => e.stopPropagation()}>
-      <div className="context-menu__section-label">ASSIGN HOTKEY</div>
-      {existingKey && (
-        <div className="context-menu__item context-menu__item--danger"
-          onClick={() => onSetHotkey(existingKey, null)}>
-          ✕ Remove [{existingKey.toUpperCase()}]
-        </div>
-      )}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:3, padding:'6px 4px' }}>
-        {letters.map(letter => (
-          <button key={letter} onClick={() => onSetHotkey(letter.toLowerCase(), slideId)}
-            style={{
-              height:26, width:'100%', borderRadius:4, cursor:'pointer',
-              background: existingKey?.toUpperCase()===letter ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.04)',
-              border:`1px solid ${existingKey?.toUpperCase()===letter ? 'rgba(212,175,55,0.5)' : '#222'}`,
-              color: existingKey?.toUpperCase()===letter ? '#D4AF37' : '#888',
-              fontSize:11, fontWeight:700,
-            }}>{letter}</button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── Context Menu ───────────────────────────────────────────────
-function ContextMenu({ menu, onEdit, onDuplicate, onCopy, onCut, onPaste, onSetGroup, onDelete, onAssignTrigger, onRemoveVideo, onSetHotkey, currentHotkeys, audioFiles, audioPlaylists }) {
-  const [triggerOpen, setTriggerOpen] = useState(false);
-  const [musicOpen, setMusicOpen] = useState(false);
-  const [filterPlaylist, setFilterPlaylist] = useState(null);
-  const [hotkeyOpen, setHotkeyOpen] = useState(false);
-  if (!menu) return null;
-
-  // Find existing hotkey for this slide
-  const existingKey = currentHotkeys ? Object.entries(currentHotkeys).find(([,id]) => id === menu.slideId)?.[0] : null;
-
-  const GROUPS = [
-    { n:'Verse', c:'#3b82f6' }, { n:'Chorus', c:'#ef4444' }, { n:'Bridge', c:'#a855f7' },
-    { n:'Pre-Chorus', c:'#f97316' }, { n:'Intro', c:'#22c55e' }, { n:'Outro', c:'#6b7280' },
-  ];
-
-  const tracks = filterPlaylist ? audioFiles.filter(f => f.playlistId === filterPlaylist) : audioFiles;
-
-  return (
-    <div className="context-menu" style={{ top: menu.y, left: menu.x }} onMouseDown={e => e.stopPropagation()}>
-      <div className="context-menu__section-label">ACTIONS</div>
-      <Item label="Edit Slide" shortcut="↵" onClick={onEdit} />
-      <Item label="Duplicate" shortcut="⌘D" onClick={onDuplicate} />
-      <Item label="Copy" shortcut="⌘C" onClick={onCopy} />
-      <Item label="Cut" shortcut="⌘X" onClick={onCut} />
-      <Item label="Paste" shortcut="⌘V" onClick={onPaste} />
-      <div className="context-menu__divider" />
-
-      {/* Trigger row */}
-      <div
-        className={`context-menu__item context-menu__item--arrow ${triggerOpen ? 'context-menu__item--hover':''}`}
-        onMouseEnter={() => { setTriggerOpen(true); setMusicOpen(false); }}
-        onMouseLeave={() => setTriggerOpen(false)}
-        style={{ position:'relative' }}
-      >
-        <span style={{ display:'flex', alignItems:'center', gap:6 }}>
-          <MusicNoteIcon color="#888" size={11}/> Trigger
-        </span>
-        <span className="context-menu__arrow">›</span>
-        {triggerOpen && (
-          <div className="context-menu context-menu--submenu">
-            <div className="context-menu__section-label">TRIGGER TYPE</div>
-            {/* Music */}
-            <div
-              className={`context-menu__item context-menu__item--arrow ${musicOpen?'context-menu__item--hover':''}`}
-              onMouseEnter={() => setMusicOpen(true)}
-              onMouseLeave={() => setMusicOpen(false)}
-              style={{ position:'relative' }}
-            >
-              <span style={{ display:'flex', alignItems:'center', gap:6 }}>
-                <MusicNoteIcon color="#888" size={11}/> Music
-              </span>
-              <span className="context-menu__arrow">›</span>
-              {musicOpen && (
-                <div className="context-menu context-menu--submenu context-menu--music">
-                  <div className="context-menu__section-label">SELECT TRACK</div>
-                  {audioPlaylists.length > 0 && (
-                    <div className="context-menu__playlist-pills">
-                      <button className={`context-menu__pill${!filterPlaylist?' active':''}`} onClick={() => setFilterPlaylist(null)}>All</button>
-                      {audioPlaylists.map(pl => (
-                        <button key={pl.id} className={`context-menu__pill${filterPlaylist===pl.id?' active':''}`} onClick={() => setFilterPlaylist(pl.id)}>{pl.name}</button>
-                      ))}
-                    </div>
-                  )}
-                  {menu.slideTriggerAudio && (
-                    <>
-                      <div className="context-menu__item context-menu__item--danger" onClick={() => onAssignTrigger(null)}>✕ Remove Trigger</div>
-                      <div className="context-menu__divider" />
-                    </>
-                  )}
-                  {tracks.length === 0
-                    ? <div className="context-menu__empty">No audio imported yet</div>
-                    : tracks.map(track => (
-                      <div key={track.id}
-                        className={`context-menu__item context-menu__track ${menu.slideTriggerAudio?.id===track.id?'context-menu__track--active':''}`}
-                        onClick={() => onAssignTrigger(track)}
-                      >
-                        <MusicNoteIcon color={menu.slideTriggerAudio?.id===track.id?'#D4AF37':'#555'} size={10}/>
-                        <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>
-                          {track.name.replace(/\.[^.]+$/,'')}
-                        </span>
-                        {menu.slideTriggerAudio?.id===track.id && <span style={{ color:'#D4AF37' }}>✓</span>}
-                      </div>
-                    ))
-                  }
-                </div>
-              )}
-            </div>
-          </div>
+      {/* Footer — sits in normal flow BELOW the thumb, never overlaps */}
+      <div className="slide-card__footer">
+        <span className="slide-card__index">{index + 1}</span>
+        {slide.group && slide.group !== 'None' && (
+          <span className="slide-card__group-label" style={{ color: slide.color || '#888', borderColor: slide.color || '#555' }}>
+            {slide.group}
+          </span>
         )}
-      </div>
-
-      <div className="context-menu__divider" />
-      <div className="context-menu__section-label">GROUP</div>
-      {GROUPS.map(opt => (
-        <div key={opt.n} className="context-menu__item" onClick={() => onSetGroup(opt.n, opt.c)}>
-          <span className="context-menu__swatch" style={{ background:opt.c }} />{opt.n}
+        <div style={{ display:'flex', gap:3, alignItems:'center', marginLeft:'auto' }}>
+          {slide.video && <VideoIcon />}
+          {slide.triggerAudio && <MusicNoteIcon />}
         </div>
-      ))}
-      <div className="context-menu__divider" />
-      {menu.slideVideo && (
-        <Item
-          label={`Remove Action: ${menu.slideVideo.split(/[\/]/).pop()}`}
-          onClick={onRemoveVideo}
-          danger
-        />
-      )}
-      <Item label="Delete" onClick={onDelete} danger />
-    </div>
-  );
-}
-
-function Item({ label, shortcut, onClick, danger }) {
-  return (
-    <div className={`context-menu__item ${danger ? 'context-menu__item--danger' : ''}`} onClick={onClick}>
-      <span>{label}</span>
-      {shortcut && <span className="context-menu__shortcut">{shortcut}</span>}
+      </div>
     </div>
   );
 }
@@ -357,123 +229,33 @@ function AddSlideButton({ onClick }) {
   );
 }
 
-function PresentationHeader({ activeSong, showArrangements, activeArrangement, showTimeline, slideCardSize, dispatch }) {
-  return (
-    <div className="pres-header">
-      <div className="pres-header__info">
-        <span className="pres-header__title">{activeSong?.title || 'No Song Selected'}</span>
-        {activeArrangement !== 'Master' && <span className="pres-header__arrangement">{activeArrangement}</span>}
-      </div>
-      <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-        <button className={`pres-header__arr-btn ${showTimeline ? 'active' : ''}`}
-          onClick={() => dispatch({ type:'TOGGLE_TIMELINE' })} title="Timeline">
-          <TimelineIcon />
-        </button>
-        {/* Slide size slider */}
-        <input type="range" min="100" max="320" step="10"
-          value={slideCardSize}
-          onChange={e => dispatch({ type:'SET_SLIDE_CARD_SIZE', payload: parseInt(e.target.value) })}
-          style={{ width:64, accentColor:'#D4AF37', cursor:'pointer', verticalAlign:'middle' }}
-          title="Slide size"
-        />
-        <button className={`pres-header__arr-btn ${showArrangements ? 'active' : ''}`}
-          onClick={() => dispatch({ type:'TOGGLE_ARRANGEMENTS' })} title="Arrangements">
-          <ArrangementIcon />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-export default function SlideGrid({
+// ── Inner grid — consumes SlideDragProvider context ────────────
+function SlideGridInner({
   state, dispatch,
   slides, displaySlides, activeSong,
   onSlideClick, onAddSlide,
   onDuplicate, onCopy, onCut, onPaste, onSetGroup, onDelete,
-  onDragOver, onDropMedia,
-  onAssignTrigger, onRemoveVideo,
-  onDragHoverSlide, onSetHotkey,
+  onDropMedia, onAssignTrigger, onRemoveVideo, onSetHotkey,
   onReorderSlide,
   audioFiles, audioPlaylists,
 }) {
-  const { selectedSlideId, selectedSlideIds = [], contextMenu, showArrangements, activeArrangement, showTimeline } = state;
-  const [dragOverSlideId,   setDragOverSlideId]   = useState(null);
-  const [reorderTarget,     setReorderTarget]      = useState(null); // slideId being dragged over for reorder
-  const reorderDragId    = React.useRef(null);
-  const reorderTargetRef = React.useRef(null); // sync ref so onUp can read without stale closure
+  const { selectedSlideId, contextMenu, hotkeys = {} } = state;
+  const [dragOverSlideId, setDragOverSlideId] = useState(null);
+  const [hotkeyDialog,    setHotkeyDialog]    = useState(null); // slideId
 
-  const handleSlideMouseDown = React.useCallback((slide) => (e) => {
-    if (e.button !== 0) return;
-    e.stopPropagation();
+  const { dragId: reorderDragId, insertBefore, startDrag: startSlideDrag } = useSlideDrag() || {};
 
-    const startX = e.clientX, startY = e.clientY;
-    let dragging = false;
+  const closeMenu = useCallback(() => dispatch({ type:'SET_CONTEXT_MENU', payload:null }), [dispatch]);
 
-    const onMove = (mv) => {
-      if (!dragging) {
-        if (Math.abs(mv.clientX - startX) < 5 && Math.abs(mv.clientY - startY) < 5) return;
-        dragging = true;
-        reorderDragId.current    = slide.id;
-        reorderTargetRef.current = null;
-        startDrag('slide-reorder', { slideId: slide.id },
-          `↕  ${slide.text?.slice(0, 22) || 'Slide'}`);
-      }
-      if (!dragging) return;
-
-      // Find which card is under cursor
-      const cards = document.querySelectorAll('.slide-card[data-slide-id]');
-      let target = null;
-      cards.forEach(card => {
-        const r = card.getBoundingClientRect();
-        if (mv.clientX >= r.left && mv.clientX <= r.right &&
-            mv.clientY >= r.top  && mv.clientY <= r.bottom) {
-          target = card.dataset.slideId;
-        }
-      });
-      const validTarget = target && target !== slide.id ? target : null;
-      reorderTargetRef.current = validTarget;   // always sync
-      setReorderTarget(validTarget);            // drives CSS
-    };
-
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-
-      if (dragging && reorderDragId.current) {
-        const from = reorderDragId.current;
-        const to   = reorderTargetRef.current;   // read sync ref — never stale
-        if (to && to !== from) {
-          onReorderSlide?.(from, to);
-        }
-        // Clean up ghost
-        const ghost = document.getElementById('ef-drag-ghost');
-        if (ghost) ghost.remove();
-      }
-
-      reorderDragId.current    = null;
-      reorderTargetRef.current = null;
-      setReorderTarget(null);
-      dragging = false;
-    };
-
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, [onReorderSlide]);
-
-  const gridRef = React.useRef(null);
-  const lassoStart = useLasso(gridRef, dispatch, slides);
-
-  // Track drag-over for both custom and native (Finder) drags
-  React.useEffect(() => {
+  // Media drag hover highlight
+  useEffect(() => {
     const onMove = (e) => {
-      if (!isDragging()) return;
-      // Find which slide card the mouse is over
-      const cards = document.querySelectorAll('.slide-card[aria-selected]');
+      if (!isDragging()) { setDragOverSlideId(null); return; }
+      const cards = document.querySelectorAll('.slide-card[data-slide-id]');
       let found = null;
       cards.forEach(card => {
         const r = card.getBoundingClientRect();
         if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
-          // Get slide id from data attribute if available
           found = card.dataset.slideId;
         }
       });
@@ -482,63 +264,80 @@ export default function SlideGrid({
     window.addEventListener('mousemove', onMove);
     return () => window.removeEventListener('mousemove', onMove);
   }, []);
-  const closeMenu = useCallback(() => dispatch({ type:'SET_CONTEXT_MENU', payload:null }), [dispatch]);
 
-  const contextSlide = contextMenu ? slides.find(s => s.id === contextMenu.slideId) : null;
-  const menuWithTrigger = contextMenu ? {
-    ...contextMenu,
-    slideTriggerAudio: contextSlide?.triggerAudio || null,
-    slideVideo: contextSlide?.video || null,
-  } : null;
+  const slideList = displaySlides || slides;
 
   return (
     <div className="slide-grid-panel" onClick={closeMenu}>
-      <PresentationHeader
-        activeSong={activeSong} showArrangements={showArrangements}
-        activeArrangement={activeArrangement} showTimeline={showTimeline}
-        slideCardSize={state.slideCardSize || 180} dispatch={dispatch}
-      />
-      <div ref={gridRef} className="slide-grid" role="listbox" aria-label="Slides"
-        style={{ '--slide-ratio': state.canvasRatio || '16 / 9', '--slide-card-size': `${state.slideCardSize || 180}px` }}
-        onMouseDown={lassoStart}>
-        {displaySlides.map((slide, i) => (
+      <div
+        className="slide-grid"
+        role="listbox" aria-label="Slides"
+        style={{
+          '--slide-ratio': state.canvasRatio || '16 / 9',
+          '--slide-card-size': `${state.slideCardSize || 180}px`,
+          display: 'flex', flexWrap: 'wrap', gap: 8,
+          alignContent: 'flex-start',
+          alignItems: 'flex-start',
+        }}
+      >
+        {slideList.map((slide, i) => (
           <React.Fragment key={slide.displayId || slide.id}>
             {slide._isFirstOfSong && (
-              <div className="slide-grid__song-divider">
+              <div className="slide-grid__song-divider" style={{ width: '100%' }}>
                 <span>{slide._songTitle}</span>
               </div>
             )}
+            {/* Insert bar BEFORE this slide */}
+            {insertBefore === slide.id && reorderDragId !== slide.id && (
+              <InsertBar color={slide.color || '#60a5fa'} />
+            )}
             <SlideThumbnail
               slide={slide} index={i}
-              isSelected={slide.id === selectedSlideId || selectedSlideIds.includes(slide.id)}
+              isSelected={slide.id === selectedSlideId}
               isDragOver={dragOverSlideId === slide.id}
-              isReorderTarget={reorderTarget === slide.id}
-              isReorderSource={reorderDragId.current === slide.id}
-              hotkey={Object.entries(state.hotkeys || {}).find(([,id]) => id === slide.id)?.[0]}
+              isReorderSource={reorderDragId === slide.id}
+              hotkey={Object.entries(hotkeys).find(([,id]) => id === slide.id)?.[0]}
               onClick={() => onSlideClick(slide)}
-              onMouseDown={handleSlideMouseDown(slide)}
-              onContextMenu={e => { e.preventDefault(); dispatch({ type:'SET_CONTEXT_MENU', payload:{ x:e.clientX, y:e.clientY, slideId:slide.id } }); }}
-              onDrop={(data, slideId) => {
-                const url = data?.src || data?.path;
-                if (url && slideId) onDropMedia?.(url, slideId);
+              onMouseDown={(e) => {
+                if (e.button !== 0) return;
+                e.stopPropagation();
+                const sx = e.clientX, sy = e.clientY;
+                let moved = false;
+                const onCheck = (mv) => {
+                  if (!moved && (Math.abs(mv.clientX - sx) > 5 || Math.abs(mv.clientY - sy) > 5)) {
+                    moved = true;
+                    window.removeEventListener('mousemove', onCheck);
+                    startSlideDrag?.(slide.id, slide.text?.slice(0, 26) || `Slide ${i + 1}`, mv.clientX, mv.clientY);
+                  }
+                };
+                const onUp = () => {
+                  window.removeEventListener('mousemove', onCheck);
+                  window.removeEventListener('mouseup', onUp);
+                };
+                window.addEventListener('mousemove', onCheck);
+                window.addEventListener('mouseup', onUp);
               }}
+              onContextMenu={e => {
+                e.preventDefault();
+                dispatch({ type:'SET_CONTEXT_MENU', payload:{ x:e.clientX, y:e.clientY, slideId:slide.id } });
+              }}
+              onDrop={(data, slideId) => onDropMedia(data, slideId)}
             />
           </React.Fragment>
         ))}
+
+        {/* Insert bar at END */}
+        {insertBefore === '__END__' && <InsertBar color="#60a5fa" />}
+
         <AddSlideButton onClick={onAddSlide} />
       </div>
 
-      {showTimeline && (
-        <TimelinePanel
-          state={state} dispatch={dispatch}
-          slides={slides} activeSong={activeSong}
-          onSlideClick={onSlideClick}
-        />
-      )}
-
       {contextMenu && (
         <ContextMenu
-          menu={menuWithTrigger}
+          menu={contextMenu}
+          slides={slides}
+          audioFiles={audioFiles || []}
+          currentHotkeys={hotkeys}
           onEdit={() => { dispatch({ type:'SET_SELECTED_SLIDE', payload:contextMenu.slideId }); dispatch({ type:'SET_MODE', payload:'edit' }); closeMenu(); }}
           onDuplicate={() => { onDuplicate(contextMenu.slideId); closeMenu(); }}
           onCopy={() => { onCopy(contextMenu.slideId); closeMenu(); }}
@@ -548,37 +347,91 @@ export default function SlideGrid({
           onDelete={() => { onDelete(contextMenu.slideId); closeMenu(); }}
           onRemoveVideo={() => { onRemoveVideo?.(contextMenu.slideId); closeMenu(); }}
           onAssignTrigger={track => { onAssignTrigger(contextMenu.slideId, track); closeMenu(); }}
-          onSetHotkey={(key, slideId) => {
-            onSetHotkey?.(key, slideId);
-            closeMenu();
+          onOpenHotkeyDialog={() => { setHotkeyDialog(contextMenu.slideId); closeMenu(); }}
+        />
+      )}
+
+      {hotkeyDialog && (
+        <HotkeyDialog
+          slideId={hotkeyDialog}
+          currentKey={Object.entries(hotkeys).find(([,id]) => id === hotkeyDialog)?.[0] || ''}
+          onConfirm={(key) => { onSetHotkey?.(key, hotkeyDialog); setHotkeyDialog(null); }}
+          onClear={() => {
+            // Remove any existing hotkey for this slide
+            const existing = Object.entries(hotkeys).find(([,id]) => id === hotkeyDialog)?.[0];
+            if (existing) onSetHotkey?.(existing, null);
+            setHotkeyDialog(null);
           }}
-          currentHotkeys={state.hotkeys || {}}
-          audioFiles={audioFiles || []}
-          audioPlaylists={audioPlaylists || []}
+          onCancel={() => setHotkeyDialog(null)}
         />
       )}
     </div>
   );
 }
 
-// Icons
+// ── Public export — wraps with SlideDragProvider ───────────────
+export default function SlideGrid(props) {
+  return (
+    <SlideGridInner {...props} />
+  );
+}
+
+// ── Context Menu ───────────────────────────────────────────────
+function ContextMenu({ menu, slides, audioFiles, currentHotkeys, onEdit, onDuplicate, onCopy, onCut, onPaste, onSetGroup, onDelete, onRemoveVideo, onAssignTrigger, onOpenHotkeyDialog }) {
+  const slide = slides?.find(s => s.id === menu?.slideId);
+  const GROUP_OPTIONS = [
+    { n:'Verse', c:'#3b82f6' }, { n:'Chorus', c:'#ef4444' }, { n:'Bridge', c:'#a855f7' },
+    { n:'Pre-Chorus', c:'#f97316' }, { n:'Intro', c:'#22c55e' }, { n:'Outro', c:'#6b7280' },
+    { n:'Tag', c:'#ec4899' }, { n:'None', c:'#2a2a2a' },
+  ];
+  const existingHotkey = Object.entries(currentHotkeys).find(([,id]) => id === menu?.slideId)?.[0];
+  return (
+    <div className="context-menu" style={{ top: menu.y, left: menu.x }} onMouseDown={e => e.stopPropagation()}>
+      <div className="context-menu__section-label">ACTIONS</div>
+      <CItem label="Edit Slide"  shortcut="↵"  onClick={onEdit} />
+      <CItem label="Duplicate"   shortcut="⌘D" onClick={onDuplicate} />
+      <CItem label="Copy"        shortcut="⌘C" onClick={onCopy} />
+      <CItem label="Cut"         shortcut="⌘X" onClick={onCut} />
+      <CItem label="Paste"       shortcut="⌘V" onClick={onPaste} />
+      {slide?.video && <CItem label="Remove Video" onClick={onRemoveVideo} />}
+      <div className="context-menu__divider" />
+      <div className="context-menu__section-label">GROUP</div>
+      {GROUP_OPTIONS.map(opt => (
+        <div key={opt.n} className="context-menu__item" onClick={() => onSetGroup(opt.n, opt.c)}>
+          <span className="context-menu__swatch" style={{ background: opt.c }} />{opt.n}
+        </div>
+      ))}
+      <div className="context-menu__divider" />
+      {/* Hotkey — single button, opens dialog */}
+      <div className="context-menu__item" onClick={onOpenHotkeyDialog}
+        style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <span>Hot Key</span>
+        {existingHotkey && (
+          <span style={{
+            fontSize:9, fontWeight:900, color:'#D4AF37',
+            background:'rgba(212,175,55,0.15)', border:'1px solid rgba(212,175,55,0.3)',
+            borderRadius:3, padding:'1px 5px', letterSpacing:0.5,
+          }}>{existingHotkey.toUpperCase()}</span>
+        )}
+      </div>
+      <div className="context-menu__divider" />
+      <CItem label="Delete" onClick={onDelete} danger />
+    </div>
+  );
+}
+
+function CItem({ label, shortcut, onClick, danger }) {
+  return (
+    <div className={`context-menu__item${danger ? ' context-menu__item--danger' : ''}`} onClick={onClick}>
+      <span>{label}</span>
+      {shortcut && <span className="context-menu__shortcut">{shortcut}</span>}
+    </div>
+  );
+}
+
 function VideoIcon() {
   return <svg viewBox="0 0 24 24" width="10" height="10" fill="#D4AF37"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>;
 }
-function MusicNoteIcon({ color='#888', size=11 }) {
-  return <svg viewBox="0 0 24 24" width={size} height={size} fill={color}><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>;
-}
-function ArrangementIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>;
-}
-function TimelineIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <line x1="2" y1="5" x2="22" y2="5"/>
-      <rect x="3" y="8" width="7" height="4" rx="1" fill="currentColor" stroke="none" opacity="0.8"/>
-      <rect x="12" y="8" width="9" height="4" rx="1" fill="currentColor" stroke="none" opacity="0.5"/>
-      <line x1="2" y1="17" x2="22" y2="17"/>
-      <rect x="2" y="13" width="11" height="3" rx="1" fill="currentColor" stroke="none" opacity="0.4"/>
-    </svg>
-  );
+function MusicNoteIcon() {
+  return <svg viewBox="0 0 24 24" width="10" height="10" fill="#888"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>;
 }

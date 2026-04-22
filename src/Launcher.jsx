@@ -63,12 +63,10 @@ function MixIcon() {
 
 // ── App Card ───────────────────────────────────────────────────
 function AppCard({ app, index }) {
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
   const [mounted, setMounted] = useState(false);
-
-  const disabled = app.comingSoon;
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 120 + index * 120);
@@ -83,27 +81,22 @@ function AppCard({ app, index }) {
       : 'rgba(255,255,255,0.018)',
     border: `1px solid ${hovered ? app.borderColor : 'rgba(255,255,255,0.07)'}`,
     padding: '40px 36px 36px',
-    cursor: disabled ? 'default' : 'pointer',
+    cursor: 'pointer',
     display: 'flex',
     flexDirection: 'column',
     gap: 0,
     position: 'relative',
     overflow: 'hidden',
-    transition:
-      'transform 0.35s cubic-bezier(0.34,1.56,0.64,1), border-color 0.25s, box-shadow 0.35s, background 0.2s',
+    transition: 'transform 0.35s cubic-bezier(0.34,1.56,0.64,1), border-color 0.25s, box-shadow 0.35s, background 0.2s',
     transform: !mounted
       ? 'translateY(32px)'
-      : hovered && !disabled
-      ? pressed
-        ? 'translateY(-2px) scale(0.99)'
-        : 'translateY(-10px) scale(1.01)'
+      : hovered
+      ? pressed ? 'translateY(-2px) scale(0.99)' : 'translateY(-10px) scale(1.01)'
       : 'translateY(0)',
-    boxShadow:
-      hovered && !disabled
-        ? `0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px ${app.borderColor}, ${app.glow}`
-        : '0 8px 32px rgba(0,0,0,0.4)',
+    boxShadow: hovered
+      ? `0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px ${app.borderColor}, ${app.glow}`
+      : '0 8px 32px rgba(0,0,0,0.4)',
     opacity: mounted ? 1 : 0,
-    filter: disabled ? 'grayscale(0.15)' : 'none',
     WebkitUserSelect: 'none',
     userSelect: 'none',
   };
@@ -112,221 +105,97 @@ function AppCard({ app, index }) {
     <div
       style={card}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => {
-        setHovered(false);
-        setPressed(false);
-      }}
-      onMouseDown={() => !disabled && setPressed(true)}
+      onMouseLeave={() => { setHovered(false); setPressed(false); }}
+      onMouseDown={() => setPressed(true)}
       onMouseUp={() => setPressed(false)}
-      onClick={() => !disabled && navigate(app.route)}
+      onClick={() => navigate(app.route)}
     >
-      {/* Coming Soon Badge */}
-      {disabled && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 18,
-            right: 18,
-            padding: '6px 10px',
-            borderRadius: 999,
-            fontSize: 10,
-            fontWeight: 800,
-            letterSpacing: 1,
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            color: '#a1a1aa',
-            zIndex: 5,
-          }}
-        >
-          COMING SOON
-        </div>
-      )}
-
       {/* Ambient glow orb behind icon */}
-      <div
-        style={{
-          position: 'absolute',
-          top: -60,
-          right: -60,
-          width: 200,
-          height: 200,
-          borderRadius: '50%',
-          background: app.orbColor,
-          filter: 'blur(60px)',
-          opacity: hovered && !disabled ? 0.5 : 0.2,
-          transition: 'opacity 0.4s',
-          pointerEvents: 'none',
-        }}
-      />
+      <div style={{
+        position: 'absolute', top: -60, right: -60,
+        width: 200, height: 200, borderRadius: '50%',
+        background: app.orbColor,
+        filter: 'blur(60px)',
+        opacity: hovered ? 0.5 : 0.2,
+        transition: 'opacity 0.4s',
+        pointerEvents: 'none',
+      }} />
 
       {/* Icon */}
-      <div
-        style={{
-          width: 88,
-          height: 88,
-          borderRadius: 22,
-          background: app.gradient,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: 28,
-          boxShadow:
-            hovered && !disabled
-              ? `0 16px 40px ${app.shadowColor}`
-              : `0 8px 24px ${app.shadowColor}`,
-          transition: 'box-shadow 0.3s',
-          flexShrink: 0,
-        }}
-      >
+      <div style={{
+        width: 88, height: 88, borderRadius: 22,
+        background: app.gradient,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        marginBottom: 28,
+        boxShadow: hovered ? `0 16px 40px ${app.shadowColor}` : `0 8px 24px ${app.shadowColor}`,
+        transition: 'box-shadow 0.3s',
+        flexShrink: 0,
+      }}>
         {app.icon}
       </div>
 
       {/* Badge */}
-      <div
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 5,
-          background: app.badgeBg,
-          border: `1px solid ${app.badgeBorder}`,
-          borderRadius: 20,
-          padding: '3px 10px',
-          marginBottom: 14,
-          alignSelf: 'flex-start',
-        }}
-      >
-        <div
-          style={{
-            width: 5,
-            height: 5,
-            borderRadius: '50%',
-            background: app.badgeDot,
-          }}
-        />
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            color: app.badgeText,
-            letterSpacing: 0.8,
-          }}
-        >
+      <div style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        background: app.badgeBg, border: `1px solid ${app.badgeBorder}`,
+        borderRadius: 20, padding: '3px 10px',
+        marginBottom: 14, alignSelf: 'flex-start',
+      }}>
+        <div style={{ width: 5, height: 5, borderRadius: '50%', background: app.badgeDot }} />
+        <span style={{ fontSize: 10, fontWeight: 700, color: app.badgeText, letterSpacing: 0.8 }}>
           {app.badge}
         </span>
       </div>
 
       {/* Name */}
-      <div
-        style={{
-          fontSize: 34,
-          fontWeight: 800,
-          color: '#e4e4e7',
-          letterSpacing: -1,
-          lineHeight: 1,
-          marginBottom: 10,
-        }}
-      >
+      <div style={{
+        fontSize: 34, fontWeight: 800, color: '#e4e4e7',
+        letterSpacing: -1, lineHeight: 1, marginBottom: 10,
+      }}>
         {app.name}
       </div>
 
       {/* Description */}
-      <div
-        style={{
-          fontSize: 13.5,
-          color: '#52525b',
-          lineHeight: 1.65,
-          flex: 1,
-          marginBottom: 32,
-        }}
-      >
+      <div style={{
+        fontSize: 13.5, color: '#52525b', lineHeight: 1.65,
+        flex: 1, marginBottom: 32,
+      }}>
         {app.description}
       </div>
 
       {/* Divider */}
-      <div
-        style={{
-          height: 1,
-          background: 'rgba(255,255,255,0.05)',
-          marginBottom: 24,
-        }}
-      />
+      <div style={{
+        height: 1, background: 'rgba(255,255,255,0.05)',
+        marginBottom: 24,
+      }} />
 
       {/* Launch button */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div
-          style={{
-            height: 38,
-            padding: '0 20px',
-            background: disabled
-              ? 'rgba(255,255,255,0.03)'
-              : hovered
-              ? app.btnBgHover
-              : app.btnBg,
-            border: `1px solid ${
-              disabled
-                ? 'rgba(255,255,255,0.06)'
-                : hovered
-                ? app.btnBorderHover
-                : app.btnBorder
-            }`,
-            borderRadius: 10,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            transition: 'all 0.2s',
-          }}
-        >
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: disabled
-                ? '#71717a'
-                : hovered
-                ? app.btnTextHover
-                : '#52525b',
-              letterSpacing: 0.3,
-              transition: 'color 0.2s',
-            }}
-          >
-            {disabled ? 'Coming Soon' : `Open ${app.name}`}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{
+          height: 38, padding: '0 20px',
+          background: hovered ? app.btnBgHover : app.btnBg,
+          border: `1px solid ${hovered ? app.btnBorderHover : app.btnBorder}`,
+          borderRadius: 10,
+          display: 'flex', alignItems: 'center', gap: 8,
+          transition: 'all 0.2s',
+        }}>
+          <span style={{
+            fontSize: 12, fontWeight: 700, color: hovered ? app.btnTextHover : '#52525b',
+            letterSpacing: 0.3, transition: 'color 0.2s',
+          }}>
+            Open {app.name}
           </span>
-
-          {!disabled && (
-            <svg
-              viewBox="0 0 16 16"
-              width="12"
-              height="12"
-              fill="none"
-              stroke={hovered ? app.btnTextHover : '#52525b'}
-              strokeWidth="2"
-              strokeLinecap="round"
-              style={{
-                transition: 'all 0.2s',
-                transform: hovered ? 'translateX(2px)' : 'none',
-              }}
-            >
-              <path d="M3 8h10M9 4l4 4-4 4" />
-            </svg>
-          )}
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke={hovered ? app.btnTextHover : '#52525b'}
+            strokeWidth="2" strokeLinecap="round"
+            style={{ transition: 'all 0.2s', transform: hovered ? 'translateX(2px)' : 'none' }}>
+            <path d="M3 8h10M9 4l4 4-4 4"/>
+          </svg>
         </div>
 
         {/* Version tag */}
-        <span
-          style={{
-            fontSize: 10,
-            color: '#27272a',
-            fontFamily: 'monospace',
-          }}
-        >
-          v1.0
-        </span>
+        <span style={{ fontSize: 10, color: '#27272a', fontFamily: 'monospace' }}>v1.0</span>
       </div>
     </div>
   );
@@ -360,7 +229,6 @@ const APPS = [
   {
     id: 'mix',
     name: 'Mix',
-    comingSoon: true,
     badge: 'AUDIO ENGINE',
     description: 'Advanced multi-track mixing, real-time effects processing, and automated leveling for a pristine worship sound.',
     route: '/mix',
@@ -384,7 +252,6 @@ const APPS = [
   {
     id: 'stream',
     name: 'Stream',
-    comingSoon: true,
     badge: 'LIVE STUDIO',
     description: 'Mix scenes, manage audio channels, control transitions, and broadcast your service live to audiences everywhere.',
     route: '/stream',
@@ -409,6 +276,7 @@ const APPS = [
 
 // ── Main Launcher ──────────────────────────────────────────────
 export default function Launcher() {
+  const navigate  = useNavigate();
   const [visible, setVisible] = useState(false);
 
   // Hide Flow-specific menu items when on launcher
@@ -500,6 +368,46 @@ export default function Launcher() {
         ))}
       </div>
 
+      {/* ── LTC Tools ── */}
+      <div style={{
+        marginTop: 32, display: 'flex', gap: 10, alignItems: 'center',
+        opacity: visible ? 1 : 0,
+        transition: 'opacity 0.6s ease 0.8s',
+      }}>
+        <div style={{ fontSize: 10, color: '#3f3f46', fontWeight: 700, letterSpacing: 1.5, marginRight: 4 }}>
+          LTC BRIDGE
+        </div>
+        {[
+          { label: 'Timecode Sender', icon: '📡', route: '/ltc-sender', color: '#D4AF37',
+            desc: 'DAW → Network' },
+          { label: 'Timecode Receiver', icon: '📥', route: '/ltc-receiver', color: '#60a5fa',
+            desc: 'Network → Resolume' },
+        ].map(tool => (
+          <div key={tool.route} onClick={() => navigate(tool.route)} style={{
+            display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+            padding: '8px 16px', borderRadius: 12,
+            background: 'rgba(255,255,255,0.03)',
+            border: `1px solid rgba(255,255,255,0.07)`,
+            transition: 'all 0.2s',
+          }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = `${tool.color}0f`;
+              e.currentTarget.style.borderColor = `${tool.color}30`;
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)';
+            }}
+          >
+            <span style={{ fontSize: 16 }}>{tool.icon}</span>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#a1a1aa', letterSpacing: -0.2 }}>{tool.label}</div>
+              <div style={{ fontSize: 9, color: '#3f3f46', letterSpacing: 0.3 }}>{tool.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* ── Footer ── */}
       <div style={{
         position: 'absolute', bottom: 24,
@@ -514,6 +422,13 @@ export default function Launcher() {
         <span style={{ fontSize: 10, color: '#27272a', fontFamily: 'monospace' }}>{time}</span>
         <div style={{ width: 3, height: 3, borderRadius: '50%', background: '#27272a' }} />
         <span style={{ fontSize: 10, color: '#27272a', fontFamily: 'monospace' }}>macOS</span>
+        <div style={{ width: 3, height: 3, borderRadius: '50%', background: '#27272a' }} />
+        <span
+          onClick={() => import('@tauri-apps/api/core').then(({ invoke }) => invoke('app_exit'))}
+          style={{ fontSize: 10, color: '#27272a', fontFamily: 'monospace', cursor: 'pointer' }}
+          onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
+          onMouseLeave={e => e.currentTarget.style.color = '#27272a'}
+        >Quit</span>
       </div>
     </div>
   );

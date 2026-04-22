@@ -16,7 +16,29 @@ import Graphics from "./Graphics";
 import AudienceView from "./AudienceView";
 import StageView from "./StageView";
 import Production from "./Production";
-import Mix from './Mix'; // <-- Import the new Mix component
+import Mix from './Mix';
+import LTCSender from './LTCSender';
+import LTCReceiver from './LTCReceiver';
+import ErrorBoundary from './ErrorBoundary';
+import { useNavigate } from 'react-router-dom';
+
+// Global listener — handles window close event (navigate-to-launcher) from any route
+function NavigationListener() {
+  const navigate = useNavigate();
+  React.useEffect(() => {
+    let unlisten;
+    import('@tauri-apps/api/event').then(({ listen }) => {
+      listen('navigate-to-launcher', () => {
+        import('@tauri-apps/api/core').then(({ invoke }) => {
+          invoke('set_app_menu_visible', { visible: false }).catch(() => {});
+        });
+        navigate('/');
+      }).then(fn => { unlisten = fn; });
+    });
+    return () => { unlisten?.(); };
+  }, [navigate]);
+  return null;
+}
 
 // Apply saved theme before render — prevents flash
 const _savedTheme = localStorage.getItem('ef_theme') || 'dark';
@@ -35,6 +57,8 @@ import('@tauri-apps/api/event').then(({ listen }) => {
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <HashRouter>
+    <ErrorBoundary>
+    <NavigationListener />
     <Routes>
       {/* ── App Launcher (default — shown after splash) ── */}
       <Route path="/"                  element={<Launcher />} />
@@ -57,7 +81,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <Route path="/configure-screens" element={<ConfigureScreens />} />
       <Route path="/graphics"          element={<Graphics />} />
       <Route path="/audience"          element={<AudienceView />} />
+      <Route path="/ltc-sender"        element={<LTCSender />} />
+      <Route path="/ltc-receiver"      element={<LTCReceiver />} />
       <Route path="/stage"             element={<StageView />} />
     </Routes>
+    </ErrorBoundary>
   </HashRouter>
 );
